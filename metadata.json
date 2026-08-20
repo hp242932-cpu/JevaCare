@@ -1,0 +1,6 @@
+{
+  "name": "Jevan Care",
+  "description": "The complete AI-powered digital healthcare ecosystem with smart prescription scanner, AI health assistant, rumor detection, emergency hub, lifestyle engine, and lifetime Medical Vault.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
