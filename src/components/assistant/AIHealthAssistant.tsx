@@ -18,10 +18,14 @@ import {
   Radio,
   CheckCircle2,
   AlertCircle,
-  Settings2
+  Settings2,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { UserProfile, HealthAssistantMessage, VaultItem, ActiveMedicine } from '../../types';
 import { JevanCareLoader } from '../common/JevanCareLoader';
+import { API_ROUTES } from '../../services/apiRoutes';
+import { supabaseAssistantMessages } from '../../services/supabaseService';
 
 interface AIHealthAssistantProps {
   userProfile?: UserProfile;
@@ -52,14 +56,14 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
     isEmergencySharingEnabled: true,
   };
 
-  const [messages, setMessages] = useState<HealthAssistantMessage[]>([
-    {
-      id: 'm_welcome',
-      sender: 'assistant',
-      text: `Hello ${currentProfile.name}! I am your Jevan Care Health Companion. Ask me about medicine side effects, disease awareness, symptom guidance, preventive care, first aid, or healthy lifestyle tips.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const welcomeMessage: HealthAssistantMessage = {
+    id: 'm_welcome',
+    sender: 'assistant',
+    text: `Hello ${currentProfile.name}! I am your Jevan Care Health Companion. Ask me about medicine side effects, disease awareness, symptom guidance, preventive care, first aid, or healthy lifestyle tips.`,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+
+  const [messages, setMessages] = useState<HealthAssistantMessage[]>([welcomeMessage]);
 
   const [input, setInput] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -79,12 +83,34 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const isMountedRef = useRef(true);
+
+  // Load chat history from Supabase if user has a profile ID
+  useEffect(() => {
+    if (!currentProfile.id) return;
+    let isMounted = true;
+    supabaseAssistantMessages.fetchMessages(currentProfile.id).then((savedMsgs) => {
+      if (isMounted && savedMsgs.length > 0) {
+        setMessages(savedMsgs);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [currentProfile.id]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, isLoading]);
 
-  const isMountedRef = useRef(true);
+  const handleClearHistory = async () => {
+    if (window.confirm('Are you sure you want to clear your chat history with the Health Companion?')) {
+      if (currentProfile.id) {
+        await supabaseAssistantMessages.clearMessages(currentProfile.id);
+      }
+      setMessages([welcomeMessage]);
+    }
+  };
 
   // Load and auto-select preferred Female Voice for SpeechSynthesis
   useEffect(() => {
@@ -290,13 +316,16 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
     };
 
     setMessages((prev) => [...prev, newUserMsg]);
+    if (currentProfile.id) {
+      supabaseAssistantMessages.saveMessage(currentProfile.id, newUserMsg);
+    }
     setInput('');
     setTranscriptPreview('');
     setSelectedImage(null);
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/gemini/health-assistant', {
+      const response = await fetch(API_ROUTES.GEMINI.HEALTH_ASSISTANT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -311,35 +340,42 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
       if (!isMountedRef.current) return;
 
       if (!json.success) {
-        throw new Error(json.error || 'AI response failed.');
+        throw new Error(json.error?.message || json.error || 'AI response failed.');
       }
+
+      const replyText = json.reply || json.data?.reply || 'I am here to support your health journey.';
+      const hasRedFlags = Boolean(json.hasRedFlags || json.data?.hasRedFlags);
 
       const botReplyId = `bot_${Date.now()}`;
       const botReply: HealthAssistantMessage = {
         id: botReplyId,
         sender: 'assistant',
-        text: json.reply,
-        hasRedFlags: json.hasRedFlags,
+        text: replyText,
+        hasRedFlags,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, botReply]);
+      if (currentProfile.id) {
+        supabaseAssistantMessages.saveMessage(currentProfile.id, botReply);
+      }
 
       // Automatically read aloud if TTS is active
       if (isTtsActive) {
-        speakText(json.reply, botReplyId);
+        speakText(replyText, botReplyId);
       }
     } catch (err: any) {
       console.error('Assistant error:', err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err_${Date.now()}`,
-          sender: 'assistant',
-          text: 'I am experiencing connection difficulty. Please try again or consult a medical professional.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      const errMsg: HealthAssistantMessage = {
+        id: `err_${Date.now()}`,
+        sender: 'assistant',
+        text: 'I am experiencing connection difficulty. Please try again or consult a medical professional.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errMsg]);
+      if (currentProfile.id) {
+        supabaseAssistantMessages.saveMessage(currentProfile.id, errMsg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -407,6 +443,18 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
             {isTtsActive ? <Volume2 className="w-4 h-4 text-blue-600" /> : <VolumeX className="w-4 h-4" />}
             <span>{isTtsActive ? 'Voice ON' : 'Muted'}</span>
           </button>
+
+          {/* Clear History Button */}
+          {messages.length > 1 && (
+            <button
+              onClick={handleClearHistory}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-rose-200 dark:hover:border-rose-800 transition-all flex items-center gap-1 shrink-0"
+              title="Clear Conversation History"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Clear Chat</span>
+            </button>
+          )}
         </div>
       </div>
 

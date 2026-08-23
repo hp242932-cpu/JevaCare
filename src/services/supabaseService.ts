@@ -110,6 +110,73 @@ export const supabaseAuth = {
     }
   },
 
+  async signInWithGoogle() {
+    try {
+      const redirectTo = window.location.origin;
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'select_account',
+            },
+          },
+        });
+        if (error) throw error;
+        auditLogger.logAction(
+          'GOOGLE_AUTH_INITIATED',
+          'Redirecting to Google OAuth authentication.',
+          {},
+          'SUCCESS'
+        );
+        return { data, error: null };
+      } else {
+        // Fallback for local preview without environment variables
+        const mockGoogleId = `usr_google_${Date.now().toString(36)}`;
+        const mockGoogleUser = {
+          id: mockGoogleId,
+          email: 'hp242932@gmail.com',
+          user_metadata: {
+            name: 'Google Health User',
+            full_name: 'Google Health User',
+            role: 'patient',
+            provider: 'google',
+          },
+          app_metadata: {
+            provider: 'google',
+            providers: ['google'],
+          },
+        };
+
+        await supabaseProfile.upsertProfile({
+          id: mockGoogleId,
+          name: 'Google Health User',
+          email: 'hp242932@gmail.com',
+          role: 'patient',
+          bloodGroup: 'O+',
+          allergies: [],
+          chronicConditions: [],
+          emergencyContacts: [],
+          isEmergencySharingEnabled: true,
+        });
+
+        auditLogger.logAction(
+          'GOOGLE_AUTH_LOGIN',
+          'Google OAuth simulated authentication session active.',
+          { email: 'hp242932@gmail.com', role: 'patient' },
+          'SUCCESS'
+        );
+
+        return { user: mockGoogleUser, session: { user: mockGoogleUser }, error: null };
+      }
+    } catch (err: any) {
+      console.warn('Google Sign-In Error:', err.message);
+      return { data: null, user: null, session: null, error: err.message || 'Failed to initiate Google Sign-In.' };
+    }
+  },
+
   async signOut() {
     if (!isSupabaseConfigured) return { error: null };
     try {
@@ -207,6 +274,58 @@ export const supabaseProfile = {
       console.warn('Supabase profile fetch error, using local cache:', err);
       const cached = localStorage.getItem(STORAGE_KEYS.PROFILE);
       return cached ? JSON.parse(cached) : null;
+    }
+  },
+
+  async fetchProfileByEmail(email: string): Promise<UserProfile | null> {
+    if (!email) return null;
+    if (!isSupabaseConfigured) {
+      const cached = localStorage.getItem(STORAGE_KEYS.PROFILE);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed.email?.toLowerCase() === email.toLowerCase()) return parsed;
+        } catch {
+          // ignore
+        }
+      }
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .ilike('email', email)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        const formatted: UserProfile = {
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          phone: data.phone,
+          age: data.age,
+          gender: data.gender,
+          bloodGroup: data.blood_group,
+          allergies: data.allergies || [],
+          chronicConditions: data.chronic_conditions || [],
+          emergencyContactName: data.emergency_contact_name,
+          emergencyContactPhone: data.emergency_contact_phone,
+          isEmergencySharingEnabled: data.is_emergency_sharing_enabled ?? true,
+          abhaNumber: data.abha_number,
+          abhaAddress: data.abha_address,
+          abhaLinked: data.abha_linked ?? false,
+        };
+        return formatted;
+      }
+      return null;
+    } catch (err) {
+      console.warn('Supabase profile fetch by email error:', err);
+      return null;
     }
   },
 
@@ -1012,17 +1131,63 @@ export const supabaseBloodDonation = {
   },
 
   async fetchMatchedRequests(bloodGroup?: BloodGroup, city?: string, state?: string): Promise<BloodRequest[]> {
-    const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_REQUESTS);
-    if (cached) {
-      try {
-        const parsed: BloodRequest[] = JSON.parse(cached);
-        if (bloodGroup) {
-          return parsed.filter((r) => r.status === 'OPEN' && r.bloodGroup === bloodGroup);
-        }
-        return parsed.filter((r) => r.status === 'OPEN');
-      } catch (e) {}
+    if (!isSupabaseConfigured) {
+      const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_REQUESTS);
+      if (cached) {
+        try {
+          const parsed: BloodRequest[] = JSON.parse(cached);
+          if (bloodGroup) {
+            return parsed.filter((r) => r.status === 'OPEN' && r.bloodGroup === bloodGroup);
+          }
+          return parsed.filter((r) => r.status === 'OPEN');
+        } catch (e) {}
+      }
+      return [];
     }
-    return [];
+
+    try {
+      let query = supabase
+        .from('blood_requests')
+        .select('*')
+        .eq('status', 'OPEN')
+        .order('created_at', { ascending: false });
+
+      if (bloodGroup) {
+        query = query.eq('blood_group', bloodGroup);
+      }
+      if (city && city !== 'All Cities') {
+        query = query.eq('city', city);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const reqs: BloodRequest[] = data.map((d: any) => ({
+          id: d.id,
+          orgId: d.org_id,
+          orgName: d.org_name,
+          bloodGroup: d.blood_group as BloodGroup,
+          unitsNeeded: d.units_needed,
+          urgency: d.urgency,
+          hospitalName: d.hospital_name,
+          city: d.city,
+          state: d.state,
+          contactEmail: d.contact_email,
+          additionalInstructions: d.additional_instructions || undefined,
+          status: d.status,
+          createdAt: d.created_at,
+        }));
+        localStorage.setItem(STORAGE_KEYS.BLOOD_REQUESTS, JSON.stringify(reqs));
+        return reqs;
+      }
+
+      return [];
+    } catch (err) {
+      console.warn('Failed to fetch blood requests from Supabase:', err);
+      const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_REQUESTS);
+      return cached ? JSON.parse(cached) : [];
+    }
   },
 
   async createOrgBloodRequest(req: BloodRequest): Promise<boolean> {
@@ -1055,12 +1220,41 @@ export const supabaseBloodDonation = {
         created_at: req.createdAt,
       });
 
-      if (error) console.warn('Supabase blood request insert error:', error.message);
+      if (error) {
+        console.warn('Supabase blood request insert error:', error.message);
+        throw error;
+      }
+      return true;
     } catch (err) {
       console.warn('Failed to save blood request to Supabase:', err);
+      return false;
+    }
+  },
+
+  async updateBloodRequestStatus(requestId: string, status: 'OPEN' | 'FULFILLED' | 'CANCELLED'): Promise<boolean> {
+    const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_REQUESTS);
+    if (cached) {
+      try {
+        const parsed: BloodRequest[] = JSON.parse(cached);
+        const updated = parsed.map((r) => (r.id === requestId ? { ...r, status } : r));
+        localStorage.setItem(STORAGE_KEYS.BLOOD_REQUESTS, JSON.stringify(updated));
+      } catch (e) {}
     }
 
-    return true;
+    if (!isSupabaseConfigured) return true;
+
+    try {
+      const { error } = await supabase
+        .from('blood_requests')
+        .update({ status })
+        .eq('id', requestId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Failed to update blood request status in Supabase:', err);
+      return false;
+    }
   },
 
   async respondToRequest(requestId: string, donorId: string, response: 'RESPONDED_YES' | 'RESPONDED_NO'): Promise<boolean> {
@@ -1075,4 +1269,246 @@ export const supabaseBloodDonation = {
     return true;
   },
 };
+
+// ============================================================================
+// 9. MEDICINE REMINDERS SERVICES
+// ============================================================================
+
+export const supabaseReminders = {
+  async fetchReminders(userId: string): Promise<Reminder[]> {
+    if (!isSupabaseConfigured) {
+      const cached = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+      return cached ? JSON.parse(cached) : [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('reminders')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const rems: Reminder[] = data.map((d: any) => ({
+          id: d.id,
+          medicineName: d.medicine_name,
+          dosage: d.dosage,
+          times: d.times || [],
+          isActive: d.is_active ?? true,
+          daysOfWeek: d.days_of_week || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          instructions: d.instructions || undefined,
+        }));
+        localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify(rems));
+        return rems;
+      }
+      return [];
+    } catch (err) {
+      console.warn('Failed to fetch reminders from Supabase:', err);
+      const cached = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+      return cached ? JSON.parse(cached) : [];
+    }
+  },
+
+  async createReminder(userId: string, reminder: Omit<Reminder, 'id'> & { id?: string }): Promise<Reminder | null> {
+    const localId = reminder.id || `rem_${Date.now()}`;
+    const newRem: Reminder = {
+      id: localId,
+      medicineName: reminder.medicineName,
+      dosage: reminder.dosage,
+      times: reminder.times,
+      isActive: reminder.isActive ?? true,
+      daysOfWeek: reminder.daysOfWeek || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      instructions: reminder.instructions,
+    };
+
+    // Update local cache
+    const current = await this.fetchReminders(userId);
+    localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify([...current, newRem]));
+
+    if (!isSupabaseConfigured) return newRem;
+
+    try {
+      const { data, error } = await supabase
+        .from('reminders')
+        .insert({
+          user_id: userId,
+          medicine_name: reminder.medicineName,
+          dosage: reminder.dosage,
+          times: reminder.times,
+          is_active: reminder.isActive ?? true,
+          days_of_week: reminder.daysOfWeek || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          instructions: reminder.instructions || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        return {
+          id: data.id,
+          medicineName: data.medicine_name,
+          dosage: data.dosage,
+          times: data.times || [],
+          isActive: data.is_active ?? true,
+          daysOfWeek: data.days_of_week || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          instructions: data.instructions || undefined,
+        };
+      }
+      return newRem;
+    } catch (err) {
+      console.warn('Failed to create reminder in Supabase:', err);
+      return newRem;
+    }
+  },
+
+  async updateReminder(userId: string, reminderId: string, updates: Partial<Reminder>): Promise<boolean> {
+    const cached = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+    if (cached) {
+      try {
+        const parsed: Reminder[] = JSON.parse(cached);
+        const updated = parsed.map((r) => (r.id === reminderId ? { ...r, ...updates } : r));
+        localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Reminder cache update error:', e);
+      }
+    }
+
+    if (!isSupabaseConfigured) return true;
+
+    try {
+      const payload: any = {};
+      if (updates.medicineName !== undefined) payload.medicine_name = updates.medicineName;
+      if (updates.dosage !== undefined) payload.dosage = updates.dosage;
+      if (updates.times !== undefined) payload.times = updates.times;
+      if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+      if (updates.daysOfWeek !== undefined) payload.days_of_week = updates.daysOfWeek;
+      if (updates.instructions !== undefined) payload.instructions = updates.instructions;
+
+      const { error } = await supabase
+        .from('reminders')
+        .update(payload)
+        .eq('id', reminderId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Failed to update reminder in Supabase:', err);
+      return false;
+    }
+  },
+
+  async deleteReminder(userId: string, reminderId: string): Promise<boolean> {
+    const cached = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+    if (cached) {
+      try {
+        const parsed: Reminder[] = JSON.parse(cached);
+        const filtered = parsed.filter((r) => r.id !== reminderId);
+        localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify(filtered));
+      } catch (e) {
+        console.warn('Reminder cache deletion error:', e);
+      }
+    }
+
+    if (!isSupabaseConfigured) return true;
+
+    try {
+      const { error } = await supabase
+        .from('reminders')
+        .delete()
+        .eq('id', reminderId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Failed to delete reminder from Supabase:', err);
+      return false;
+    }
+  },
+
+  async toggleReminderStatus(userId: string, reminderId: string, isActive: boolean): Promise<boolean> {
+    return this.updateReminder(userId, reminderId, { isActive });
+  },
+};
+
+// ============================================================================
+// 10. ASSISTANT CHAT MESSAGES PERSISTENCE SERVICES
+// ============================================================================
+
+export const supabaseAssistantMessages = {
+  async fetchMessages(userId: string, limit = 50): Promise<HealthAssistantMessage[]> {
+    if (!isSupabaseConfigured) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('assistant_messages')
+        .select('*')
+        .eq('user_id', userId)
+        .order('timestamp', { ascending: true })
+        .limit(limit);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        return data.map((d: any) => ({
+          id: d.id,
+          sender: d.sender,
+          text: d.text,
+          imageUrl: d.image_url || undefined,
+          hasRedFlags: d.has_red_flags ?? false,
+          timestamp: d.timestamp
+            ? new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }));
+      }
+      return [];
+    } catch (err) {
+      console.warn('Failed to fetch assistant messages from Supabase:', err);
+      return [];
+    }
+  },
+
+  async saveMessage(userId: string, msg: HealthAssistantMessage): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
+
+    try {
+      const { error } = await supabase.from('assistant_messages').insert({
+        user_id: userId,
+        sender: msg.sender,
+        text: msg.text,
+        image_url: msg.imageUrl || null,
+        has_red_flags: msg.hasRedFlags ?? false,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Failed to save assistant message to Supabase:', err);
+      return false;
+    }
+  },
+
+  async clearMessages(userId: string): Promise<boolean> {
+    if (!isSupabaseConfigured) return true;
+
+    try {
+      const { error } = await supabase
+        .from('assistant_messages')
+        .delete()
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Failed to clear assistant messages from Supabase:', err);
+      return false;
+    }
+  },
+};
+
 

@@ -22,7 +22,10 @@ import {
   Activity,
   Layers,
   Lightbulb,
-  FileText
+  FileText,
+  ArrowRight,
+  Zap,
+  MapPin
 } from 'lucide-react';
 import {
   UserProfile,
@@ -73,42 +76,70 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const safeRiskAlerts = riskAlerts || [];
   const upcomingApps = safeAppointments.filter((a) => a?.status === 'Upcoming');
 
+  // Next prioritized action calculation
+  const nextMedicine = safeActiveMedicines[0];
+  const nextAppointment = upcomingApps[0];
+
   return (
-    <div className="space-y-8 min-w-0 w-full animate-fade-up">
+    <div className="space-y-6 sm:space-y-8 min-w-0 w-full animate-fade-up">
 
       {/* =========================================================================
-          PRIMARY HEALTH SUMMARY & CONTEXT (Immediate Focal Point)
+          1. HOW AM I DOING? (Primary Health Status Snapshot & Next Action)
           ========================================================================= */}
-      <section className="bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-2xl p-6 sm:p-8 shadow-xs transition-colors">
+      <section className="bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-3xl p-6 sm:p-8 shadow-xs transition-colors relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           
-          <div className="space-y-2 min-w-0">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#5c5647] dark:text-[#c0b9ad]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>Health Status: Stable & Optimal • Score {healthScore}/100</span>
+          <div className="space-y-2.5 min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#5c5647] dark:text-[#c0b9ad]">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Health Status: Stable & Optimal
+              </span>
+              <span>•</span>
+              <span className="font-bold text-[#1b3b2b] dark:text-white">Score: {healthScore}/100</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-light font-askan text-[#1b3b2b] dark:text-[#f2f0e8] tracking-tight">
-              Welcome back, {profile.name}
+
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif-editorial font-bold text-[#1b3b2b] dark:text-[#f2f0e8] tracking-tight">
+              Good day, {profile.name}
             </h1>
+            
             <p className="text-sm text-[#5c5647] dark:text-[#c0b9ad] max-w-2xl leading-relaxed">
-              Your primary health summary is up to date. You have {safeActiveMedicines.length} active routine {safeActiveMedicines.length === 1 ? 'medication' : 'medications'} scheduled and {upcomingApps.length} upcoming medical consultation.
+              Your health vitals are in target range. You have {safeActiveMedicines.length} active routine {safeActiveMedicines.length === 1 ? 'medication' : 'medications'} scheduled today and {safeVaultItems.length} encrypted records in your vault.
             </p>
+
+            {/* Live Vital Badges */}
+            <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#1b3b2b] dark:text-[#f2f0e8]">
+                <Activity className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
+                <span>BP: <strong>118/76 mmHg</strong></span>
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#1b3b2b] dark:text-[#f2f0e8]">
+                <HeartPulse className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                <span>Sugar: <strong>92 mg/dL</strong></span>
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#1b3b2b] dark:text-[#f2f0e8]">
+                <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>Adherence: <strong>94% Streak</strong></span>
+              </span>
+            </div>
           </div>
 
-          {/* Quick Primary Actions */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0">
+          {/* Quick Primary Shortcuts */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0">
             <button
               onClick={() => setActiveTab('scanner')}
-              className="btn-primary"
+              className="px-4 py-2.5 bg-[#1b3b2b] hover:bg-[#244836] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer border border-[#1b3b2b]"
               aria-label="Scan Prescription"
             >
-              <ScanLine className="w-4 h-4" />
+              <ScanLine className="w-4 h-4 text-emerald-300" />
               <span>Scan Prescription</span>
             </button>
 
             <button
               onClick={() => setActiveTab('assistant')}
-              className="btn-secondary"
+              className="px-4 py-2.5 bg-white dark:bg-[#1e3025] hover:bg-[#f6f2e9] text-[#1b3b2b] dark:text-white text-xs font-bold rounded-xl border border-[#e6dfd3] dark:border-[#2b4233] transition-all flex items-center gap-2 cursor-pointer"
               aria-label="Ask Health Assistant"
             >
               <Bot className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -117,23 +148,171 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <button
               onClick={onOpenEmergency}
-              className="p-2.5 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-transparent hover:border-rose-200 dark:hover:border-rose-900 transition-all cursor-pointer"
+              className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900 transition-all cursor-pointer"
               title="Emergency SOS Hub"
               aria-label="Emergency SOS"
             >
-              <AlertTriangle className="w-5 h-5" />
+              <AlertTriangle className="w-4 h-4" />
             </button>
           </div>
+
+        </div>
+
+        {/* 2. WHAT SHOULD I DO NEXT? (Contextual Prioritized Action Card) */}
+        <div className="mt-6 pt-5 border-t border-[#e6dfd3]/80 dark:border-[#283c2e] bg-[#fcfaf6] dark:bg-[#192b20] -mx-6 sm:-mx-8 -mb-6 sm:-mb-8 p-5 sm:p-6 rounded-b-3xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shrink-0 mt-0.5">
+                <Zap className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-extrabold tracking-wider text-emerald-800 dark:text-emerald-400">
+                  Recommended Next Action
+                </span>
+                <p className="font-bold text-xs sm:text-sm text-[#1b3b2b] dark:text-white">
+                  {nextMedicine ? (
+                    `Take ${nextMedicine.name} (${nextMedicine.dosage}) — ${nextMedicine.frequency}`
+                  ) : nextAppointment ? (
+                    `Upcoming consultation with ${nextAppointment.doctorName} on ${nextAppointment.date}`
+                  ) : (
+                    `Upload your latest prescription or health report to your encrypted vault`
+                  )}
+                </p>
+                <p className="text-[11px] text-[#827b6c] dark:text-slate-400 mt-0.5">
+                  {nextMedicine ? (
+                    `Salt: ${nextMedicine.salt} • Instruction: ${nextMedicine.instructions || 'Take with water'}`
+                  ) : (
+                    `AI OCR will automatically catalog medicines, salts, and safety contraindications.`
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              {nextMedicine ? (
+                <button
+                  onClick={() => onMarkDoseTaken(nextMedicine.id)}
+                  className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Mark Dose Taken</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setActiveTab('scanner')}
+                  className="px-3.5 py-2 bg-[#1b3b2b] hover:bg-[#244836] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                >
+                  <ScanLine className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Scan New Rx</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================================
+          3. WHAT CAN JEVAN CARE HELP ME WITH? (Connected 5-Step Health Journey)
+          ========================================================================= */}
+      <section className="bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-3xl p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+            <h2 className="font-bold text-sm text-[#1b3b2b] dark:text-white">
+              Connected Health Journey Workflow
+            </h2>
+          </div>
+          <span className="text-[10px] uppercase font-bold tracking-widest text-[#827b6c] dark:text-slate-400">
+            End-to-End Care Loop
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          
+          {/* Step 1 */}
+          <button
+            onClick={() => setActiveTab('scanner')}
+            className="p-3 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-emerald-500 transition-all text-left group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#e8eee5] dark:bg-[#253d2f] text-[#2b503b] dark:text-emerald-300">
+                1. Scan Rx
+              </span>
+              <ScanLine className="w-4 h-4 text-[#827b6c] group-hover:text-[#1b3b2b] dark:group-hover:text-emerald-400 transition-colors" />
+            </div>
+            <h4 className="font-bold text-xs text-[#1b3b2b] dark:text-white leading-snug">OCR Medicine Scanner</h4>
+            <p className="text-[11px] text-[#827b6c] dark:text-slate-400 mt-1 line-clamp-2">Handwritten parsing & dosage confirmation.</p>
+          </button>
+
+          {/* Step 2 */}
+          <button
+            onClick={() => setActiveTab('medicine')}
+            className="p-3 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-emerald-500 transition-all text-left group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#e8eee5] dark:bg-[#253d2f] text-[#2b503b] dark:text-emerald-300">
+                2. Salts & Risks
+              </span>
+              <Pill className="w-4 h-4 text-[#827b6c] group-hover:text-[#1b3b2b] dark:group-hover:text-emerald-400 transition-colors" />
+            </div>
+            <h4 className="font-bold text-xs text-[#1b3b2b] dark:text-white leading-snug">Medicine Intelligence</h4>
+            <p className="text-[11px] text-[#827b6c] dark:text-slate-400 mt-1 line-clamp-2">Interaction checks & generic price comparison.</p>
+          </button>
+
+          {/* Step 3 */}
+          <button
+            onClick={() => setActiveTab('vault')}
+            className="p-3 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-emerald-500 transition-all text-left group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#e8eee5] dark:bg-[#253d2f] text-[#2b503b] dark:text-emerald-300">
+                3. Vault
+              </span>
+              <FolderLock className="w-4 h-4 text-[#827b6c] group-hover:text-[#1b3b2b] dark:group-hover:text-emerald-400 transition-colors" />
+            </div>
+            <h4 className="font-bold text-xs text-[#1b3b2b] dark:text-white leading-snug">AES-256 Vault</h4>
+            <p className="text-[11px] text-[#827b6c] dark:text-slate-400 mt-1 line-clamp-2">Encrypted report storage & ABHA ID linkage.</p>
+          </button>
+
+          {/* Step 4 */}
+          <button
+            onClick={() => setActiveTab('progress')}
+            className="p-3 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-emerald-500 transition-all text-left group cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#e8eee5] dark:bg-[#253d2f] text-[#2b503b] dark:text-emerald-300">
+                4. Track
+              </span>
+              <Activity className="w-4 h-4 text-[#827b6c] group-hover:text-[#1b3b2b] dark:group-hover:text-emerald-400 transition-colors" />
+            </div>
+            <h4 className="font-bold text-xs text-[#1b3b2b] dark:text-white leading-snug">Vitals & Progress</h4>
+            <p className="text-[11px] text-[#827b6c] dark:text-slate-400 mt-1 line-clamp-2">BP, Glucose & trend recovery charts.</p>
+          </button>
+
+          {/* Step 5 */}
+          <button
+            onClick={() => setActiveTab('doctors')}
+            className="p-3 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-emerald-500 transition-all text-left group cursor-pointer col-span-2 sm:col-span-1"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#e8eee5] dark:bg-[#253d2f] text-[#2b503b] dark:text-emerald-300">
+                5. Care & GPS
+              </span>
+              <Stethoscope className="w-4 h-4 text-[#827b6c] group-hover:text-[#1b3b2b] dark:group-hover:text-emerald-400 transition-colors" />
+            </div>
+            <h4 className="font-bold text-xs text-[#1b3b2b] dark:text-white leading-snug">Doctors & Nearby</h4>
+            <p className="text-[11px] text-[#827b6c] dark:text-slate-400 mt-1 line-clamp-2">Telehealth specialists & 24/7 hospitals.</p>
+          </button>
 
         </div>
       </section>
 
       {/* Safety Risk Alert Banner if any detected */}
       {safeRiskAlerts.length > 0 && (
-        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 flex items-start gap-3 shadow-xs">
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 flex items-start gap-3 shadow-xs">
           <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-xs uppercase tracking-wider text-amber-800 dark:text-amber-300">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-amber-800 dark:text-amber-300">
               Active Clinical Safety Advisory
             </h4>
             <p className="text-xs text-amber-800 dark:text-amber-300/90 mt-0.5">
@@ -142,7 +321,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <button
             onClick={() => setActiveTab('medicine')}
-            className="text-xs font-semibold text-amber-900 dark:text-amber-300 hover:underline shrink-0"
+            className="text-xs font-bold text-amber-900 dark:text-amber-300 hover:underline shrink-0"
           >
             Review Details
           </button>
@@ -155,18 +334,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-w-0">
 
         {/* Essential Section 1: Active Routine Medications (7 Columns) */}
-        <section className="lg:col-span-7 bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+        <section className="lg:col-span-7 bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-[#e6dfd3] dark:border-[#283c2e] mb-4">
               <div className="flex items-center gap-2">
                 <Pill className="w-5 h-5 text-[#1b3b2b] dark:text-[#a3d4b6]" />
-                <h2 className="font-semibold text-base text-[#1b3b2b] dark:text-[#f2f0e8]">
+                <h2 className="font-bold text-base text-[#1b3b2b] dark:text-[#f2f0e8]">
                   Daily Medication Schedule
                 </h2>
               </div>
               <button
                 onClick={() => setActiveTab('medicine')}
-                className="text-xs font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>View Full Cabinet</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -179,7 +358,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <p className="text-sm font-medium">No active medications scheduled for today</p>
                 <button
                   onClick={() => setActiveTab('scanner')}
-                  className="mt-3 text-xs font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
+                  className="mt-3 text-xs font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
                 >
                   Scan a prescription to add routine doses
                 </button>
@@ -189,14 +368,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {safeActiveMedicines.slice(0, 4).map((med) => (
                   <div
                     key={med.id}
-                    className="flex items-center justify-between p-3.5 rounded-xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] gap-3 transition-colors"
+                    className="flex items-center justify-between p-3.5 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] gap-3 transition-colors"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm text-[#1b3b2b] dark:text-[#f2f0e8] truncate">
+                        <p className="font-bold text-xs sm:text-sm text-[#1b3b2b] dark:text-[#f2f0e8] truncate">
                           {med.name}
                         </p>
-                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-[#e8eee5] dark:bg-[#23382b] text-[#2b503b] dark:text-[#a3d4b6]">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#e8eee5] dark:bg-[#23382b] text-[#2b503b] dark:text-[#a3d4b6]">
                           {med.dosage}
                         </span>
                       </div>
@@ -207,7 +386,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     <button
                       onClick={() => onMarkDoseTaken(med.id)}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       <span>Take Dose</span>
@@ -222,27 +401,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span>Active routine: {safeActiveMedicines.length} items</span>
             <button
               onClick={() => setActiveTab('scanner')}
-              className="font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1"
+              className="font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Medication</span>
+              <span>Add from Prescription</span>
             </button>
           </div>
         </section>
 
         {/* Essential Section 2: Clinical Appointments & Care Plan (5 Columns) */}
-        <section className="lg:col-span-5 bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
+        <section className="lg:col-span-5 bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-[#e6dfd3] dark:border-[#283c2e] mb-4">
               <div className="flex items-center gap-2">
                 <Stethoscope className="w-5 h-5 text-[#1b3b2b] dark:text-[#a3d4b6]" />
-                <h2 className="font-semibold text-base text-[#1b3b2b] dark:text-[#f2f0e8]">
+                <h2 className="font-bold text-base text-[#1b3b2b] dark:text-[#f2f0e8]">
                   Care & Consultations
                 </h2>
               </div>
               <button
                 onClick={() => setActiveTab('doctors')}
-                className="text-xs font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1"
               >
                 <span>Find Doctors</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -254,13 +433,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {upcomingApps.slice(0, 2).map((app) => (
                   <div
                     key={app.id}
-                    className="p-3.5 rounded-xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] space-y-1.5"
+                    className="p-3.5 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <p className="font-semibold text-sm text-[#1b3b2b] dark:text-[#f2f0e8]">
+                      <p className="font-bold text-xs sm:text-sm text-[#1b3b2b] dark:text-[#f2f0e8]">
                         {app.doctorName}
                       </p>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                         {app.specialty}
                       </span>
                     </div>
@@ -271,9 +450,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] text-center py-6">
+              <div className="p-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] text-center py-6">
                 <Calendar className="w-8 h-8 mx-auto mb-2 text-[#827b6c] dark:text-[#969082] opacity-40" />
-                <p className="font-medium text-sm text-[#1b3b2b] dark:text-[#f2f0e8]">
+                <p className="font-bold text-sm text-[#1b3b2b] dark:text-[#f2f0e8]">
                   No upcoming appointments scheduled
                 </p>
                 <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] mt-1 max-w-xs mx-auto">
@@ -281,7 +460,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </p>
                 <button
                   onClick={() => setActiveTab('doctors')}
-                  className="mt-3 btn-secondary text-xs px-3 py-1.5 min-h-[36px]"
+                  className="mt-3 px-3 py-1.5 bg-[#1b3b2b] hover:bg-[#244836] text-white text-xs font-bold rounded-xl transition-all"
                 >
                   Book Doctor Consultation
                 </button>
@@ -293,9 +472,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span>Telehealth & In-clinic support</span>
             <button
               onClick={() => setActiveTab('doctors')}
-              className="font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
+              className="font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
             >
-              Browse Specialties →
+              Browse Specialists →
             </button>
           </div>
         </section>
@@ -303,52 +482,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* =========================================================================
-          KEY VITALS STATUS TICKER (Core Baseline Metrics)
-          ========================================================================= */}
-      <div className="bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs text-[#5c5647] dark:text-[#c0b9ad]">
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">Blood Pressure:</span>
-            <span>118/76 mmHg</span>
-            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">Optimal</span>
-          </div>
-          <div className="hidden sm:block h-3 w-px bg-[#e6dfd3] dark:bg-[#283c2e]"></div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">Blood Sugar:</span>
-            <span>92 mg/dL</span>
-            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">Normal</span>
-          </div>
-          <div className="hidden sm:block h-3 w-px bg-[#e6dfd3] dark:bg-[#283c2e]"></div>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">Health Score:</span>
-            <span>88/100</span>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setActiveTab('progress')}
-          className="font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1"
-        >
-          <span>Log or View Full Vitals</span>
-          <ArrowUpRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* =========================================================================
           PROGRESSIVE DISCLOSURE: ADDITIONAL INSIGHTS SECTION
           Groups non-essential health widgets to minimize cognitive overload
           ========================================================================= */}
-      <section className="bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-2xl shadow-xs transition-colors overflow-hidden">
+      <section className="bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-3xl shadow-xs transition-colors overflow-hidden">
         
         {/* Accordion / Disclosure Header */}
         <div className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#fcfaf6]/80 dark:bg-[#192b20]/60 border-b border-[#e6dfd3] dark:border-[#283c2e]">
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <h3 className="font-semibold text-base text-[#1b3b2b] dark:text-[#f2f0e8]">
+              <h3 className="font-bold text-base text-[#1b3b2b] dark:text-[#f2f0e8]">
                 Additional Insights & Health Intelligence
               </h3>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#e8eee5] dark:bg-[#23382b] text-[#2b503b] dark:text-[#a3d4b6]">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#e8eee5] dark:bg-[#23382b] text-[#2b503b] dark:text-[#a3d4b6]">
                 4 Modular Tools
               </span>
             </div>
@@ -359,11 +506,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <button
             onClick={() => setShowAdditionalInsights(!showAdditionalInsights)}
-            className="btn-secondary text-xs px-4 py-2 self-start sm:self-auto shrink-0 flex items-center gap-2"
+            className="px-3.5 py-2 rounded-xl border border-[#e6dfd3] dark:border-[#283c2e] text-xs font-bold text-[#1b3b2b] dark:text-white hover:bg-white dark:hover:bg-[#1f3328] transition-all self-start sm:self-auto shrink-0 flex items-center gap-2 cursor-pointer"
             aria-expanded={showAdditionalInsights}
             aria-controls="additional-insights-content"
           >
-            <span>{showAdditionalInsights ? 'Hide Insights' : 'Explore Insights'}</span>
+            <span>{showAdditionalInsights ? 'Hide Additional Tools' : 'Explore Additional Tools'}</span>
             {showAdditionalInsights ? (
               <ChevronUp className="w-4 h-4 text-[#5c5647] dark:text-[#c0b9ad]" />
             ) : (
@@ -380,7 +527,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-[#e6dfd3] dark:border-[#283c2e]">
               <button
                 onClick={() => setActiveInsightTab('wisdom')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeInsightTab === 'wisdom'
                     ? 'bg-[#1b3b2b] text-white dark:bg-[#a3d4b6] dark:text-[#0f1a14] shadow-xs'
                     : 'text-[#5c5647] dark:text-[#c0b9ad] hover:bg-[#f6f2e9] dark:hover:bg-[#1d2e23]'
@@ -392,7 +539,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               <button
                 onClick={() => setActiveInsightTab('clinical')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeInsightTab === 'clinical'
                     ? 'bg-[#1b3b2b] text-white dark:bg-[#a3d4b6] dark:text-[#0f1a14] shadow-xs'
                     : 'text-[#5c5647] dark:text-[#c0b9ad] hover:bg-[#f6f2e9] dark:hover:bg-[#1d2e23]'
@@ -404,7 +551,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               <button
                 onClick={() => setActiveInsightTab('alerts')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeInsightTab === 'alerts'
                     ? 'bg-[#1b3b2b] text-white dark:bg-[#a3d4b6] dark:text-[#0f1a14] shadow-xs'
                     : 'text-[#5c5647] dark:text-[#c0b9ad] hover:bg-[#f6f2e9] dark:hover:bg-[#1d2e23]'
@@ -416,7 +563,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               <button
                 onClick={() => setActiveInsightTab('vault')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeInsightTab === 'vault'
                     ? 'bg-[#1b3b2b] text-white dark:bg-[#a3d4b6] dark:text-[#0f1a14] shadow-xs'
                     : 'text-[#5c5647] dark:text-[#c0b9ad] hover:bg-[#f6f2e9] dark:hover:bg-[#1d2e23]'
@@ -428,12 +575,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Active Insight Module */}
-            <div className="min-h-[260px]">
+            <div className="min-h-[240px]">
               {activeInsightTab === 'wisdom' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">
+                      <h4 className="text-sm font-bold text-[#1b3b2b] dark:text-[#f2f0e8]">
                         Daily Personalized Wellness Wisdom
                       </h4>
                       <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad]">
@@ -442,16 +589,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <button
                       onClick={() => setActiveTab('lifestyle')}
-                      className="text-xs font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
+                      className="text-xs font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
                     >
                       Open Wellness Hub →
                     </button>
                   </div>
                   <DailyWellnessWisdom
                     profile={profile}
-                    metricLogs={metricLogs}
-                    activeMedicines={activeMedicines}
-                    onNavigateToTab={setActiveTab}
+                    onOpenYogaGuide={() => setActiveTab('lifestyle')}
                   />
                 </div>
               )}
@@ -460,25 +605,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">
-                        AI Clinical Analytics & Trend Forecast
+                      <h4 className="text-sm font-bold text-[#1b3b2b] dark:text-[#f2f0e8]">
+                        AI Clinical Intelligence Summary
                       </h4>
                       <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad]">
-                        Longitudinal review of your health vitals, medication adherence, and proactive risks.
+                        Real-time cross-metric health trajectories and automated clinical adherence scoring.
                       </p>
                     </div>
                     <button
                       onClick={() => setActiveTab('progress')}
-                      className="text-xs font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
+                      className="text-xs font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
                     >
-                      View All Vitals Charts →
+                      View Detailed Trends →
                     </button>
                   </div>
                   <AIInsightsWidget
                     profile={profile}
+                    activeMedicines={safeActiveMedicines}
+                    riskAlerts={safeRiskAlerts}
                     metricLogs={metricLogs}
-                    activeMedicines={activeMedicines}
-                    onNavigateToTab={setActiveTab}
+                    onViewFullLogs={() => setActiveTab('progress')}
                   />
                 </div>
               )}
@@ -487,19 +633,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">
-                        Local Regional Health Alerts
+                      <h4 className="text-sm font-bold text-[#1b3b2b] dark:text-[#f2f0e8]">
+                        Regional Epidemiological & Environmental Alerts
                       </h4>
                       <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad]">
-                        Real-time seasonal epidemiology, air quality advisories, and flu trends in your region.
+                        Grounded in Lucknow regional surveillance data for proactive preventive wellness.
                       </p>
                     </div>
-                    <button
-                      onClick={() => setActiveTab('map')}
-                      className="text-xs font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
-                    >
-                      Nearby Health Facilities →
-                    </button>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
+                      Lucknow Region (Live)
+                    </span>
                   </div>
                   <LocalHealthAlertsSection />
                 </div>
@@ -509,64 +652,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">
-                        Encrypted Medical Vault Summary
+                      <h4 className="text-sm font-bold text-[#1b3b2b] dark:text-[#f2f0e8]">
+                        Medical Vault Status
                       </h4>
                       <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad]">
-                        Digitized lab reports, past prescriptions, imaging scans, and vaccine certificates.
+                        AES-256 encrypted storage of prescriptions, laboratory panels, and diagnostic imaging.
                       </p>
                     </div>
                     <button
                       onClick={() => setActiveTab('vault')}
-                      className="text-xs font-semibold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
+                      className="text-xs font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
                     >
-                      Open Full Vault ({safeVaultItems.length}) →
+                      Open Full Vault →
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-                    <div
-                      onClick={() => setActiveTab('vault')}
-                      className="p-4 rounded-xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-[#a3d4b6] transition-all cursor-pointer"
-                    >
-                      <FileText className="w-5 h-5 text-[#1b3b2b] dark:text-[#a3d4b6] mb-2" />
-                      <p className="text-xs font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">Lab Reports</p>
-                      <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] mt-1">
-                        {safeVaultItems.filter((i) => i.category === 'lab-report').length || 12} files saved
-                      </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32]">
+                      <span className="text-[10px] font-bold uppercase text-[#827b6c] block">Total Documents</span>
+                      <span className="text-2xl font-bold text-[#1b3b2b] dark:text-white mt-1 block">{safeVaultItems.length}</span>
+                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">Encrypted on Cloud</span>
                     </div>
 
-                    <div
-                      onClick={() => setActiveTab('vault')}
-                      className="p-4 rounded-xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-[#a3d4b6] transition-all cursor-pointer"
-                    >
-                      <Pill className="w-5 h-5 text-[#1b3b2b] dark:text-[#a3d4b6] mb-2" />
-                      <p className="text-xs font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">Prescriptions</p>
-                      <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] mt-1">
-                        {safeVaultItems.filter((i) => i.category === 'prescription').length || 8} files saved
-                      </p>
+                    <div className="p-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32]">
+                      <span className="text-[10px] font-bold uppercase text-[#827b6c] block">ABHA Health Card</span>
+                      <span className="text-sm font-bold text-[#1b3b2b] dark:text-white mt-2 block font-mono">
+                        {profile.abhaId || '91-4829-1049-3821'}
+                      </span>
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold">Verified Sandbox ABHA</span>
                     </div>
 
-                    <div
-                      onClick={() => setActiveTab('vault')}
-                      className="p-4 rounded-xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-[#a3d4b6] transition-all cursor-pointer"
-                    >
-                      <Activity className="w-5 h-5 text-[#1b3b2b] dark:text-[#a3d4b6] mb-2" />
-                      <p className="text-xs font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">Scans & Imaging</p>
-                      <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] mt-1">
-                        {safeVaultItems.filter((i) => i.category === 'scan').length || 4} files saved
-                      </p>
-                    </div>
-
-                    <div
-                      onClick={() => setActiveTab('vault')}
-                      className="p-4 rounded-xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] hover:border-[#1b3b2b] dark:hover:border-[#a3d4b6] transition-all cursor-pointer"
-                    >
-                      <ShieldCheck className="w-5 h-5 text-[#1b3b2b] dark:text-[#a3d4b6] mb-2" />
-                      <p className="text-xs font-semibold text-[#1b3b2b] dark:text-[#f2f0e8]">Vaccinations</p>
-                      <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] mt-1">
-                        {safeVaultItems.filter((i) => i.category === 'vaccine').length || 3} files saved
-                      </p>
+                    <div className="p-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase text-[#827b6c] block">Quick Action</span>
+                      <button
+                        onClick={() => setActiveTab('vault')}
+                        className="mt-2 w-full py-2 bg-[#1b3b2b] hover:bg-[#244836] text-white text-xs font-bold rounded-xl transition-all"
+                      >
+                        Upload to Vault
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -575,11 +698,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           </div>
         )}
-
       </section>
 
     </div>
   );
 };
+
 
 

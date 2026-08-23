@@ -19,7 +19,9 @@ import {
   Settings,
   Sun,
   Moon,
-  Laptop
+  Laptop,
+  FlaskConical,
+  X
 } from 'lucide-react';
 import { UserProfile, UserRole, AppNotification, RoleType } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -60,7 +62,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   setActiveTab = (_tab: string) => {},
   isOnline = true,
 }) => {
-  const { signOut } = useAuth();
+  const { signOut, isDemoMode, exitDemoMode, authMode } = useAuth();
   const { theme, resolvedTheme, setTheme } = useTheme();
 
   const currentProfile = userProfile || profile || {
@@ -97,11 +99,35 @@ export const Header: React.FC<HeaderProps> = React.memo(({
 
   const handleSignOut = async () => {
     setShowUserMenu(false);
-    await signOut();
+    if (isDemoMode) {
+      exitDemoMode();
+    } else {
+      await signOut();
+    }
   };
 
   return (
     <header className="sticky top-0 z-40 bg-[#fcfaf6]/90 dark:bg-[#121e17]/90 backdrop-blur-md border-b border-[#e6dfd3] dark:border-[#233529] transition-colors">
+      
+      {/* Demo Mode Global Indicator Ribbon (if in Demo Mode) */}
+      {isDemoMode && (
+        <div className="bg-amber-500/10 dark:bg-amber-950/40 border-b border-amber-500/30 px-4 py-1.5 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between">
+          <div className="flex items-center gap-2 max-w-2xl">
+            <FlaskConical className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
+            <span className="font-semibold">
+              Demo Simulation Mode: Operating on sample health records.
+            </span>
+          </div>
+          <button
+            onClick={exitDemoMode}
+            className="font-bold text-[11px] underline hover:text-amber-950 dark:hover:text-white flex items-center gap-1 cursor-pointer"
+          >
+            <span>Exit Demo</span>
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         
         {/* Brand Logo */}
@@ -111,15 +137,21 @@ export const Header: React.FC<HeaderProps> = React.memo(({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-askan text-xl tracking-tight text-[#1b3b2b] dark:text-[#f2f0e8]">
+              <span className="font-serif-editorial font-bold text-xl tracking-tight text-[#1b3b2b] dark:text-[#f2f0e8]">
                 Jevan Care
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#e8eee5] text-[#2b503b] border border-[#d3decf]">
-                Lifelong
-              </span>
+              {isDemoMode ? (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                  Demo
+                </span>
+              ) : (
+                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#e8eee5] dark:bg-[#1f3328] text-[#2b503b] dark:text-[#a3d4b6] border border-[#d3decf] dark:border-[#2a4535]">
+                  Lifelong
+                </span>
+              )}
             </div>
             <p className="text-xs text-[#5c5647] dark:text-[#a8a192] font-medium hidden sm:block">
-              Your Digital Health Companion
+              {isDemoMode ? 'Simulated Interactive Sandbox' : 'Encrypted Digital Health Network'}
             </p>
           </div>
         </div>
@@ -320,7 +352,12 @@ export const Header: React.FC<HeaderProps> = React.memo(({
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-60 bg-white dark:bg-[#18281f] rounded-2xl shadow-xl border border-[#e6dfd3] dark:border-[#2a3f32] p-2 z-50 animate-in fade-in zoom-in-95 space-y-2">
                 <div className="px-3 py-2 bg-[#faf8f5] dark:bg-[#121e17] rounded-xl border border-[#e6dfd3] dark:border-[#233529]">
-                  <p className="text-xs font-bold text-[#1b3b2b] dark:text-[#f2f0e8] truncate">{currentProfile.name}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-[#1b3b2b] dark:text-[#f2f0e8] truncate">{currentProfile.name}</p>
+                    {isDemoMode && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900">DEMO</span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-[#827b6c] truncate">{currentProfile.email}</p>
                   {currentProfile.abhaNumber && (
                     <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#e8eee5] text-[#2b503b] text-[10px] font-mono font-bold">
@@ -370,7 +407,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-[#a83b3b] hover:bg-[#f8ebea] dark:hover:bg-[#3d1e20] rounded-xl transition-colors cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5 text-[#a83b3b]" />
-                    <span>Sign Out</span>
+                    <span>{isDemoMode ? 'Exit Demo Mode' : 'Sign Out'}</span>
                   </button>
                 </div>
               </div>
@@ -382,3 +419,4 @@ export const Header: React.FC<HeaderProps> = React.memo(({
     </header>
   );
 });
+

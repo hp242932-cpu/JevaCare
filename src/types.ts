@@ -1,5 +1,6 @@
 export type UserRole = 'patient' | 'doctor' | 'admin';
 export type RoleType = 'Patient' | 'Doctor';
+export type AuthMode = 'ACCOUNT' | 'DEMO' | 'LOADING' | 'SIGNED_OUT';
 
 export interface UserProfile {
   id: string;

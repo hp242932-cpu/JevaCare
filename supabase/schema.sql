@@ -203,11 +203,137 @@ CREATE POLICY "Users can manage their assistant messages"
     WITH CHECK (auth.uid() = user_id);
 
 --------------------------------------------------------------------------------
--- 8. STORAGE BUCKET CONFIGURATION & POLICIES
+-- 8. DOCTORS DIRECTORY & VERIFICATION TABLE
+--------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.doctors (
+    id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    photo_url TEXT,
+    avatar_url TEXT,
+    specialty TEXT NOT NULL,
+    qualification TEXT NOT NULL,
+    registration_number TEXT NOT NULL,
+    registration_authority TEXT NOT NULL,
+    experience_years INT NOT NULL DEFAULT 0,
+    rating NUMERIC NOT NULL DEFAULT 0,
+    reviews_count INT NOT NULL DEFAULT 0,
+    hospital TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    country TEXT NOT NULL DEFAULT 'India',
+    address TEXT,
+    fees NUMERIC NOT NULL DEFAULT 500,
+    consultation_types TEXT[] NOT NULL DEFAULT '{"Video", "In-Person"}',
+    about TEXT,
+    languages TEXT[] NOT NULL DEFAULT '{"English", "Hindi"}',
+    verification_status TEXT NOT NULL DEFAULT 'PENDING' CHECK (verification_status IN ('VERIFIED', 'PENDING', 'REJECTED')),
+    online_status TEXT NOT NULL DEFAULT 'online' CHECK (online_status IN ('online', 'offline', 'busy')),
+    available_days TEXT[] DEFAULT '{"Mon", "Tue", "Wed", "Thu", "Fri"}',
+    available_slots TEXT[] DEFAULT '{"09:30 AM", "11:00 AM", "02:30 PM", "04:15 PM"}',
+    consultation_duration_mins INT DEFAULT 20,
+    lat NUMERIC,
+    lng NUMERIC,
+    distance_km NUMERIC DEFAULT 2.0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    last_active_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.doctors ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view verified doctors"
+    ON public.doctors FOR SELECT
+    USING (verification_status = 'VERIFIED' OR (auth.uid() IS NOT NULL AND auth.uid() = user_id));
+
+CREATE POLICY "Doctors can manage their own profile"
+    ON public.doctors FOR ALL
+    USING (auth.uid() IS NOT NULL AND auth.uid() = user_id)
+    WITH CHECK (auth.uid() IS NOT NULL AND auth.uid() = user_id);
+
+CREATE POLICY "Authenticated users can register as doctor"
+    ON public.doctors FOR INSERT
+    WITH CHECK (auth.uid() IS NOT NULL);
+
+--------------------------------------------------------------------------------
+-- 9. BLOOD DONORS DIRECTORY TABLE
+--------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.blood_donors (
+    id TEXT PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT,
+    blood_group TEXT NOT NULL CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    country TEXT NOT NULL DEFAULT 'India',
+    preferred_contact_method TEXT NOT NULL DEFAULT 'Email' CHECK (preferred_contact_method IN ('Email', 'Phone', 'SMS', 'WhatsApp')),
+    availability TEXT NOT NULL DEFAULT 'Available' CHECK (availability IN ('Available', 'Busy', 'Temporarily Unavailable')),
+    last_donation_date DATE,
+    consent_given BOOLEAN NOT NULL DEFAULT true,
+    consent_given_at TIMESTAMPTZ DEFAULT NOW(),
+    notifications_paused BOOLEAN NOT NULL DEFAULT false,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.blood_donors ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their own blood donor profile"
+    ON public.blood_donors FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Authenticated users can search active voluntary blood donors"
+    ON public.blood_donors FOR SELECT
+    USING (is_active = true AND consent_given = true);
+
+--------------------------------------------------------------------------------
+-- 10. BLOOD REQUESTS TABLE
+--------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.blood_requests (
+    id TEXT PRIMARY KEY,
+    org_id TEXT NOT NULL,
+    org_name TEXT NOT NULL,
+    blood_group TEXT NOT NULL CHECK (blood_group IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+    units_needed INT NOT NULL DEFAULT 1,
+    urgency TEXT NOT NULL DEFAULT 'URGENT' CHECK (urgency IN ('CRITICAL', 'URGENT', 'STANDARD')),
+    hospital_name TEXT NOT NULL,
+    city TEXT NOT NULL,
+    state TEXT NOT NULL,
+    contact_email TEXT NOT NULL,
+    contact_phone TEXT,
+    additional_instructions TEXT,
+    status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'FULFILLED', 'CANCELLED')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.blood_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view open blood requests"
+    ON public.blood_requests FOR SELECT
+    USING (status = 'OPEN');
+
+CREATE POLICY "Authenticated users can create blood requests"
+    ON public.blood_requests FOR INSERT
+    WITH CHECK (auth.uid() IS NOT NULL);
+
+--------------------------------------------------------------------------------
+-- 11. STORAGE BUCKET CONFIGURATION & POLICIES
 --------------------------------------------------------------------------------
 -- Create medical-documents storage bucket
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('medical-documents', 'medical-documents', false)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('user-avatars', 'user-avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('doctor-photos', 'doctor-photos', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage Security Policies
@@ -222,3 +348,11 @@ CREATE POLICY "Users can view their medical documents"
 CREATE POLICY "Users can delete their medical documents"
     ON storage.objects FOR DELETE
     USING (bucket_id = 'medical-documents' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+CREATE POLICY "Anyone can view doctor photos"
+    ON storage.objects FOR SELECT
+    USING (bucket_id IN ('doctor-photos', 'user-avatars'));
+
+CREATE POLICY "Authenticated users can upload avatars and photos"
+    ON storage.objects FOR INSERT
+    WITH CHECK (bucket_id IN ('doctor-photos', 'user-avatars') AND auth.uid() IS NOT NULL);

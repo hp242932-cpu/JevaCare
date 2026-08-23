@@ -78,6 +78,7 @@ import {
   Appointment,
   VaultItem,
   HealthMetricLog,
+  Reminder,
   RoleType
 } from './types';
 
@@ -87,11 +88,21 @@ import {
   supabaseMedicines,
   supabaseVault,
   supabaseAppointments,
-  supabaseHealthMetrics
+  supabaseHealthMetrics,
+  supabaseReminders
 } from './services/supabaseService';
 
 export function App() {
-  const { isAuthenticated, isLoading, profile: authProfile, user } = useAuth();
+  const {
+    authMode,
+    isAccountMode,
+    isDemoMode,
+    isAuthenticated,
+    isLoading,
+    profile: authProfile,
+    user,
+    exitDemoMode
+  } = useAuth();
 
   const {
     isOnline,
@@ -106,8 +117,10 @@ export function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [activeRole, setActiveRole] = useState<RoleType>('Patient');
 
-  // Core State
-  const [userProfile, setUserProfile] = useState<UserProfile>(authProfile || initialProfile);
+  // Core State - Isolated between Demo & Account
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    return authProfile || initialProfile;
+  });
   const [activeMedicines, setActiveMedicines] = useState<ActiveMedicine[]>(initialActiveMedicines);
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [vaultItems, setVaultItems] = useState<VaultItem[]>(initialVaultItems);
@@ -131,33 +144,40 @@ export function App() {
       if (authProfile.role === 'doctor') {
         setActiveRole('Doctor');
         setActiveTab((prev) => (prev.startsWith('doctor-') ? prev : 'doctor-dashboard'));
+      } else {
+        setActiveRole('Patient');
+        setActiveTab((prev) => (prev.startsWith('doctor-') ? 'dashboard' : prev));
       }
+    } else if (isDemoMode) {
+      setUserProfile(initialProfile);
     }
-  }, [authProfile]);
+  }, [authProfile, isDemoMode]);
 
-  // Modals state
+  // Modals state - Only trigger automatic onboarding for real Account mode users who haven't completed it
   const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => {
+    if (isDemoMode) return false;
     return !localStorage.getItem('jeevancare_onboarding_completed');
   });
 
-  // Supabase Data Sync Effect when authenticated
+  // Supabase Data Sync Effect ONLY when in Real Account Mode
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAccountMode || !user?.id) return;
 
     let isMounted = true;
 
     async function loadSupabaseData() {
       try {
-        const userId = user?.id || 'current_user';
+        const userId = user.id;
 
-        const [dbProfile, dbMeds, dbVault, dbApps, dbMetrics] = await Promise.all([
+        const [dbProfile, dbMeds, dbVault, dbApps, dbMetrics, dbReminders] = await Promise.all([
           supabaseProfile.fetchProfile(userId),
           supabaseMedicines.fetchActiveMedicines(userId),
           supabaseVault.fetchVaultItems(userId),
           supabaseAppointments.fetchAppointments(userId),
           supabaseHealthMetrics.fetchMetricLogs(userId),
+          supabaseReminders.fetchReminders(userId),
         ]);
 
         if (isMounted) {
@@ -166,6 +186,7 @@ export function App() {
           if (dbVault && dbVault.length > 0) setVaultItems(dbVault);
           if (dbApps && dbApps.length > 0) setAppointments(dbApps);
           if (dbMetrics && dbMetrics.length > 0) setMetricLogs(dbMetrics);
+          if (dbReminders && dbReminders.length > 0) setReminders(dbReminders);
         }
       } catch (err) {
         console.warn('Supabase sync error, operating in offline fallback mode:', err);
@@ -177,9 +198,9 @@ export function App() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAccountMode, user?.id]);
 
-  // Handlers (Defined BEFORE any early returns)
+  // Handlers (Strictly separate Real DB writes from Demo Mode local writes)
   const handleMarkDoseTaken = useCallback((medId: string) => {
     setActiveMedicines((prev) =>
       prev.map((m) =>
@@ -190,13 +211,40 @@ export function App() {
 
   const handleAddActiveMedicine = useCallback((newMed: ActiveMedicine) => {
     setActiveMedicines((prev) => [newMed, ...prev]);
-    supabaseMedicines.addMedicine(user?.id || 'current_user', newMed);
-  }, [user?.id]);
+    if (isAccountMode && user?.id) {
+      supabaseMedicines.addMedicine(user.id, newMed);
+    }
+  }, [isAccountMode, user?.id]);
+
+  const handleAddReminder = useCallback((newRem: Reminder) => {
+    setReminders((prev) => [...prev, newRem]);
+    if (isAccountMode && user?.id) {
+      supabaseReminders.createReminder(user.id, newRem);
+    }
+  }, [isAccountMode, user?.id]);
+
+  const handleToggleReminder = useCallback((remId: string, active: boolean) => {
+    setReminders((prev) =>
+      prev.map((r) => (r.id === remId ? { ...r, isActive: active } : r))
+    );
+    if (isAccountMode && user?.id) {
+      supabaseReminders.toggleReminderStatus(user.id, remId, active);
+    }
+  }, [isAccountMode, user?.id]);
+
+  const handleDeleteReminder = useCallback((remId: string) => {
+    setReminders((prev) => prev.filter((r) => r.id !== remId));
+    if (isAccountMode && user?.id) {
+      supabaseReminders.deleteReminder(user.id, remId);
+    }
+  }, [isAccountMode, user?.id]);
 
   const handleAddVaultItem = useCallback((newItem: VaultItem) => {
     setVaultItems((prev) => [newItem, ...prev]);
-    supabaseVault.addVaultItem(user?.id || 'current_user', newItem);
-  }, [user?.id]);
+    if (isAccountMode && user?.id) {
+      supabaseVault.addVaultItem(user.id, newItem);
+    }
+  }, [isAccountMode, user?.id]);
 
   const handleDeleteVaultItem = useCallback((id: string) => {
     setVaultItems((prev) => prev.filter((i) => i.id !== id));
@@ -204,13 +252,17 @@ export function App() {
 
   const handleBookAppointment = useCallback((newApp: Appointment) => {
     setAppointments((prev) => [newApp, ...prev]);
-    supabaseAppointments.createAppointment(user?.id || 'current_user', newApp);
-  }, [user?.id]);
+    if (isAccountMode && user?.id) {
+      supabaseAppointments.createAppointment(user.id, newApp);
+    }
+  }, [isAccountMode, user?.id]);
 
   const handleAddMetricLog = useCallback((newLog: HealthMetricLog) => {
     setMetricLogs((prev) => [newLog, ...prev]);
-    supabaseHealthMetrics.addMetricLog(user?.id || 'current_user', newLog);
-  }, [user?.id]);
+    if (isAccountMode && user?.id) {
+      supabaseHealthMetrics.addMetricLog(user.id, newLog);
+    }
+  }, [isAccountMode, user?.id]);
 
   const handleOpenEmergency = useCallback(() => setIsEmergencyOpen(true), []);
   const handleCloseEmergency = useCallback(() => setIsEmergencyOpen(false), []);
@@ -222,16 +274,16 @@ export function App() {
   }, []);
 
   // If initial auth state is loading, show full-screen pulse loader
-  if (isLoading) {
+  if (isLoading || authMode === 'LOADING') {
     return (
-      <div className="min-h-screen bg-[#faf8f5] flex flex-col items-center justify-center p-6 text-[#1b3b2b]">
+      <div className="min-h-screen bg-[#faf8f5] dark:bg-[#121e17] flex flex-col items-center justify-center p-6 text-[#1b3b2b] dark:text-[#f2f0e8]">
         <JevanCareLoader size="lg" color="forest" label="Verifying secure Jevan Care session..." />
       </div>
     );
   }
 
-  // If unauthenticated, show standalone welcome & auth page
-  if (!isAuthenticated) {
+  // If unauthenticated / signed out, show standalone welcome & auth page
+  if (authMode === 'SIGNED_OUT' || !isAuthenticated) {
     return <AuthScreen />;
   }
 
@@ -312,7 +364,7 @@ export function App() {
               />
             ) : (
               <>
-                {activeTab === 'dashboard' && (
+                {(activeTab === 'dashboard' || activeTab === 'home' || !['scanner', 'medicine', 'care', 'doctors', 'map', 'rumor', 'assistant', 'ai', 'progress', 'lifestyle', 'vault', 'records', 'profile', 'blood-donation', 'admin'].includes(activeTab)) && (
                   <Dashboard
                     profile={userProfile}
                     activeMedicines={activeMedicines}
@@ -335,7 +387,7 @@ export function App() {
                   />
                 )}
 
-                {activeTab === 'medicine' && (
+                {(activeTab === 'medicine' || activeTab === 'care') && (
                   <MedicineIntelligence
                     activeMedicines={activeMedicines}
                     onAddActiveMedicine={handleAddActiveMedicine}
@@ -360,7 +412,7 @@ export function App() {
 
                 {activeTab === 'rumor' && <FactCheckCenter />}
 
-                {activeTab === 'assistant' && (
+                {(activeTab === 'assistant' || activeTab === 'ai') && (
                   <AIHealthAssistant
                     profile={userProfile}
                     vaultItems={vaultItems}
@@ -385,7 +437,7 @@ export function App() {
                   />
                 )}
 
-                {activeTab === 'vault' && (
+                {(activeTab === 'vault' || activeTab === 'records') && (
                   <MedicalVault
                     vaultItems={vaultItems}
                     profile={userProfile}

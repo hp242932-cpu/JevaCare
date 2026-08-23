@@ -604,17 +604,100 @@ app.post('/api/gemini/fact-check', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// API 3: AI Health Assistant (Multimodal Chat)
+// API 3: AI Health Assistant (Multimodal Chat & Wellness)
 // ----------------------------------------------------
 app.post('/api/gemini/health-assistant', async (req, res) => {
-  const { messages, userProfile, vaultItems, activeMedicines } = req.body;
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: 'Messages array is required.' });
+  // 1. Strict Payload Validation
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'INVALID_REQUEST',
+        message: 'Request body must be a valid JSON object.',
+      },
+    });
   }
 
-  const lastMsg = messages[messages.length - 1]?.text || '';
-  const redFlagKeywords = ['chest pain', 'shortness of breath', 'can\'t breathe', 'difficulty breathing', 'face drooping', 'slurred speech', 'anaphylaxis', 'severe bleeding', 'unconscious'];
-  const hasRedFlags = redFlagKeywords.some((kw) => lastMsg.toLowerCase().includes(kw));
+  const { messages, userProfile, vaultItems, activeMedicines } = req.body;
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'INVALID_REQUEST',
+        message: 'The "messages" field is required and must be a non-empty array.',
+      },
+    });
+  }
+
+  if (messages.length > 50) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'INVALID_REQUEST',
+        message: 'Exceeded maximum allowable message history length (50 messages).',
+      },
+    });
+  }
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (!msg || typeof msg !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_REQUEST',
+          message: `Message at index ${i} must be a valid object.`,
+        },
+      });
+    }
+    if (typeof msg.text !== 'string' && !msg.imageUrl) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_REQUEST',
+          message: `Message at index ${i} must have a string "text" or "imageUrl".`,
+        },
+      });
+    }
+    if (typeof msg.text === 'string' && msg.text.length > 15000) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_REQUEST',
+          message: `Message at index ${i} exceeds maximum allowed character length (15,000 chars).`,
+        },
+      });
+    }
+  }
+
+  // 2. Red Flag / Emergency Detection
+  const redFlagKeywords = [
+    'chest pain',
+    'shortness of breath',
+    "can't breathe",
+    'cant breathe',
+    'difficulty breathing',
+    'face drooping',
+    'slurred speech',
+    'anaphylaxis',
+    'severe bleeding',
+    'unconscious',
+    'heart attack',
+    'stroke',
+    'coughing up blood',
+    'severe head trauma',
+  ];
+
+  const allUserText = messages
+    .filter((m: any) => m.sender === 'user' || m.role === 'user')
+    .map((m: any) => (m.text || '').toLowerCase())
+    .join(' ');
+
+  const hasRedFlags = redFlagKeywords.some((kw) => allUserText.includes(kw));
+
+  const emergencyWarningText =
+    '🚨 EMERGENCY MEDICAL WARNING DETECTED 🚨\n\nYour inquiry mentions severe, acute red-flag symptoms. Please immediately call Emergency Medical Services (911 or 112 / 108 in India) or proceed immediately to the nearest hospital Emergency Room (ER) for urgent clinical evaluation!';
 
   try {
     const ai = getGeminiClient();
@@ -624,7 +707,7 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
       : 'No stored medical vault records.';
 
     const medsSummary = Array.isArray(activeMedicines) && activeMedicines.length > 0
-      ? activeMedicines.map((m: any) => `- ${m.name} (${m.dosage}): ${m.frequency}, Salt: ${m.salt || 'N/A'}, Doctor: ${m.doctorName || 'N/A'}, Instructions: ${m.instructions || 'N/A'}`).join('\n')
+      ? activeMedicines.map((m: any) => `- ${m.name} (${m.dosage || 'Standard'}): ${m.frequency || 'Daily'}, Salt: ${m.salt || 'N/A'}, Doctor: ${m.doctorName || 'N/A'}, Instructions: ${m.instructions || 'N/A'}`).join('\n')
       : 'No active prescribed medicines.';
 
     const systemInstruction = `
@@ -645,7 +728,7 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
     1. Answer health questions clearly, accurately, and empathetically regarding medicines, symptoms, preventive care, first aid, and healthy lifestyle choices.
     2. Reference the patient's stored active medicines or medical vault documents ONLY when relevant to their question (e.g. when asking about their prescriptions, past lab reports, or drug safety).
     3. ALWAYS include a clear medical disclaimer that your advice is for informational purposes only and does NOT replace professional medical diagnosis or consultation.
-    4. If the user mentions RED FLAG EMERGENCY symptoms (e.g., crushing chest pain, sudden difficulty breathing, sudden face drooping, severe bleeding, anaphylaxis, severe confusion), IMMEDIATELY warn them to call emergency services (911) or visit the nearest ER emergency room.
+    4. If the user mentions RED FLAG EMERGENCY symptoms (e.g., crushing chest pain, sudden difficulty breathing, sudden face drooping, severe bleeding, anaphylaxis, severe confusion), IMMEDIATELY warn them to call emergency services (911 or local emergency) or visit the nearest ER emergency room.
     `;
 
     // Map conversation messages
@@ -661,12 +744,13 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
       }
       parts.push({ text: m.text || '' });
       return {
-        role: m.sender === 'user' ? 'user' : 'model',
+        role: m.sender === 'user' || m.role === 'user' ? 'user' : 'model',
         parts,
       };
     });
 
-    const response = await ai.models.generateContent({
+    // 3. Timeout Wrapper for Gemini Call (18 seconds)
+    const geminiPromise = ai.models.generateContent({
       model: 'gemini-3.6-flash',
       contents: formattedContents,
       config: {
@@ -674,31 +758,71 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
       },
     });
 
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), 18000);
+    });
+
+    const response = await Promise.race([geminiPromise, timeoutPromise]);
+
     const replyText = response.text || 'I am here to support your health journey. Please consult your physician for medical diagnosis.';
     const isEmergencyReply = ['emergency', '911', 'chest pain', 'call 911', 'er room', 'ambulance', 'anaphylaxis'].some((kw) => replyText.toLowerCase().includes(kw));
 
-    return res.json({
+    return res.status(200).json({
       success: true,
+      data: {
+        reply: replyText,
+        hasRedFlags: hasRedFlags || isEmergencyReply,
+        isEmergency: isEmergencyReply,
+        isFallback: false,
+      },
       reply: replyText,
       hasRedFlags: hasRedFlags || isEmergencyReply,
+      isFallback: false,
     });
   } catch (error: any) {
-    if (isQuotaOrRateLimitError(error)) {
-      console.warn('[Health Assistant] Gemini API quota limit reached. Operating in local AI assistant mode.');
+    if (hasRedFlags) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          reply: emergencyWarningText,
+          hasRedFlags: true,
+          isEmergency: true,
+          isFallback: true,
+        },
+        reply: emergencyWarningText,
+        hasRedFlags: true,
+        isFallback: true,
+      });
+    }
+
+    const isTimeout = error?.message === 'GEMINI_TIMEOUT';
+    const isQuota = isQuotaOrRateLimitError(error);
+
+    if (isTimeout) {
+      console.warn('[Health Assistant] Timeout reached while generating AI response. Using resilient health fallback.');
+    } else if (isQuota) {
+      console.warn('[Health Assistant] Gemini quota reached. Using resilient health fallback.');
     } else {
       console.error('Health Assistant Error:', error?.message || error);
     }
 
-    let replyText = `Hello ${userProfile?.name || 'there'}! I am Jevan Care AI Assistant. Thank you for your question: "${lastMsg}".\n\nFor optimal health, ensure you keep hydrated, follow prescribed medication schedules, and get adequate rest. If you are experiencing persistent or unusual symptoms, we recommend scheduling an appointment with your doctor.\n\n⚠️ Disclaimer: Information provided is for awareness only and is not a substitute for professional medical diagnosis.`;
+    const lastMsg = messages[messages.length - 1]?.text || '';
+    const isWisdomQuery = lastMsg.toLowerCase().includes('daily wellness tip') || lastMsg.toLowerCase().includes('wellness tip');
 
-    if (hasRedFlags) {
-      replyText = `🚨 EMERGENCY WARNING DETECTED 🚨\n\nYour query mentions severe red-flag symptoms. Please immediately call Emergency Medical Services (911) or proceed to the nearest Emergency Room (ER) for urgent clinical evaluation!`;
-    }
+    const fallbackReply = isWisdomQuery
+      ? `Prioritizing consistent hydration, 7-8 hours of restful sleep, and balanced daily movement supports cellular vitality and metabolic resilience throughout your day.`
+      : `Hello ${userProfile?.name || 'there'}! I am Jevan Care AI Assistant. Thank you for your question: "${lastMsg}".\n\nFor optimal health, ensure you keep hydrated, follow prescribed medication schedules, and get adequate rest. If you are experiencing persistent or unusual symptoms, we recommend consulting your healthcare provider.\n\n⚠️ Disclaimer: Information provided is for awareness only and is not a substitute for professional medical diagnosis.`;
 
-    return res.json({
+    return res.status(200).json({
       success: true,
-      reply: replyText,
-      hasRedFlags,
+      data: {
+        reply: fallbackReply,
+        hasRedFlags: false,
+        isEmergency: false,
+        isFallback: true,
+      },
+      reply: fallbackReply,
+      hasRedFlags: false,
       isFallback: true,
     });
   }

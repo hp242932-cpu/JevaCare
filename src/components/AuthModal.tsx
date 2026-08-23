@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { auditLogger } from '../services/AuditLogger';
-import { supabaseAuth } from '../services/supabaseService';
+import { useAuth } from '../context/AuthContext';
 import { JevanCareLoader } from './common/JevanCareLoader';
 
 interface AuthModalProps {
@@ -35,6 +35,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   setProfile,
   onLoginSuccess,
 }) => {
+  const { signIn, signInWithGoogle, signUp, isDemoMode, authMode } = useAuth();
+
   const currentProfile = userProfile || profile || {
     id: 'u1',
     name: 'Aarav Sharma',
@@ -47,16 +49,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     emergencyContactName: 'Pooja Sharma',
     emergencyContactPhone: '+91 98765 12345',
     isEmergencySharingEnabled: true,
-  };
-
-  const updateProfile = (updater: (prev: UserProfile) => UserProfile) => {
-    const updated = updater(currentProfile);
-    if (onLoginSuccess) {
-      onLoginSuccess(updated);
-    }
-    if (setProfile) {
-      setProfile(updated);
-    }
   };
 
   const [mode, setMode] = useState<'login' | 'signup' | 'otp' | 'mfa' | 'forgot'>('login');
@@ -79,56 +71,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (mode === 'signup') {
-        const { user, error } = await supabaseAuth.signUp(email, password, name || 'User', role);
+        const { error } = await signUp(email, password, name || 'User', role);
         if (error) {
           setMessage(error);
           setIsSuccess(false);
           setIsLoading(false);
           return;
         }
-        setMode('otp');
-        setMessage('Account created! Enter verification OTP sent to ' + email);
         setIsSuccess(true);
+        setMessage('Account created and verified! Redirecting...');
+        setTimeout(() => {
+          onClose();
+        }, 1200);
       } else if (mode === 'login') {
-        const { user, error } = await supabaseAuth.signIn(email, password);
+        const { error } = await signIn(email, password);
         if (error) {
-          // If fallback local dev or demo login
-          if (email && password) {
-            setMode('otp');
-            setMessage('A 6-digit verification code has been sent to your email.');
-            setIsSuccess(true);
-          } else {
-            setMessage(error);
-            setIsSuccess(false);
-          }
+          setMessage(error);
+          setIsSuccess(false);
           setIsLoading(false);
           return;
         }
-        if (currentProfile.mfaEnabled) {
-          setMode('mfa');
-        } else {
-          setMode('otp');
-          setMessage('A 6-digit verification code has been sent to your email.');
-          setIsSuccess(true);
-        }
-      } else if (mode === 'otp' || mode === 'mfa') {
-        updateProfile((prev) => ({
-          ...prev,
-          name: name || prev.name,
-          email: email || prev.email,
-          role: role,
-        }));
-        auditLogger.logAction(
-          'USER_LOGIN',
-          `Authenticated successfully via ${mode.toUpperCase()} mode as ${role.toUpperCase()}. Supabase session synced.`,
-          { name: name || userProfile?.name || 'Aarav Sharma', role },
-          'SUCCESS'
-        );
         setIsSuccess(true);
-        setMessage('Supabase authentication verified! Redirecting to secure portal...');
+        setMessage('Signed in successfully! Redirecting...');
         setTimeout(() => {
-          setIsSuccess(false);
-          setMessage('');
           onClose();
         }, 1200);
       } else if (mode === 'forgot') {
@@ -144,20 +109,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-
-  const handleGoogleAuth = () => {
-    updateProfile((prev) => ({
-      ...prev,
-      name: prev.name || 'Aarav Sharma',
-      email: email || 'aarav.sharma@gmail.com',
-    }));
-    setIsSuccess(true);
-    setMessage('Authenticated via Google OAuth 2.0.');
-    setTimeout(() => {
+  const handleGoogleAuth = async () => {
+    setIsLoading(true);
+    try {
+      const { success, error } = await signInWithGoogle();
+      if (!success) {
+        setMessage(error || 'Google Sign-In could not be initialized.');
+        setIsSuccess(false);
+      } else {
+        setIsSuccess(true);
+        setMessage('Google authentication session active. Redirecting...');
+        setTimeout(() => {
+          onClose();
+        }, 1000);
+      }
+    } catch (err: any) {
+      setMessage(err.message || 'Google authentication failed.');
       setIsSuccess(false);
-      setMessage('');
-      onClose();
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
