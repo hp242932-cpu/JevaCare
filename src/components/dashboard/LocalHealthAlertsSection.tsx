@@ -220,7 +220,7 @@ export const LocalHealthAlertsSection: React.FC = React.memo(() => {
       {/* Alerts List */}
       {!isLoading && (
         <div className="space-y-4">
-          {alerts.map((alert) => {
+          {(alerts || []).map((alert) => {
             const isExpanded = expandedAlertId === alert.id;
             const isHigh = alert.severity?.toLowerCase() === 'high';
             const isMedium = alert.severity?.toLowerCase() === 'medium';
@@ -276,14 +276,14 @@ export const LocalHealthAlertsSection: React.FC = React.memo(() => {
                 </div>
 
                 {/* Expanded Actionable Prevention Tips */}
-                {isExpanded && alert.preventionTips && alert.preventionTips.length > 0 && (
+                {isExpanded && Array.isArray(alert.preventionTips) && alert.preventionTips.length > 0 && (
                   <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-700/60 space-y-2.5 animate-fadeIn">
                     <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Recommended Prevention & Precautions for UP Citizens</span>
                     </p>
                     <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {alert.preventionTips.map((tip, idx) => (
+                      {(alert.preventionTips || []).map((tip, idx) => (
                         <li key={idx} className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-200 flex items-start gap-2">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0 mt-1.5" />
                           <span>{tip}</span>
@@ -299,7 +299,7 @@ export const LocalHealthAlertsSection: React.FC = React.memo(() => {
       )}
 
       {/* Grounding Citations & Official Sources */}
-      {sources && sources.length > 0 && (
+      {Array.isArray(sources) && sources.length > 0 && (
         <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -312,7 +312,7 @@ export const LocalHealthAlertsSection: React.FC = React.memo(() => {
           </div>
 
           <div className="flex flex-wrap gap-2 pt-1">
-            {sources.map((src, i) => (
+            {(sources || []).map((src, i) => (
               <a
                 key={i}
                 href={src.uri}

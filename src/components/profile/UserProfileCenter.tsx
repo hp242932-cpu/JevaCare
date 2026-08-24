@@ -10,10 +10,14 @@ import {
   AlertTriangle,
   Save,
   Plus,
-  Trash2
+  Trash2,
+  Building2,
+  Sparkles
 } from 'lucide-react';
-import { UserProfile, RoleType, VaultItem } from '../../types';
+import { UserProfile, RoleType, VaultItem, EconomicProfile } from '../../types';
 import { AbhaLinkingCard } from './AbhaLinkingCard';
+import { EconomicAffordabilityModal } from '../accessibility/EconomicAffordabilityModal';
+import { accessibilityIntelligenceService } from '../../services/accessibilityIntelligenceService';
 
 interface UserProfileCenterProps {
   userProfile?: UserProfile;
@@ -60,6 +64,10 @@ export const UserProfileCenter: React.FC<UserProfileCenterProps> = ({
   const [newCondition, setNewCondition] = useState('');
 
   const [isSaved, setIsSaved] = useState(false);
+  const [isEconomicModalOpen, setIsEconomicModalOpen] = useState(false);
+  const [economicProfile, setEconomicProfile] = useState<EconomicProfile | null>(() => {
+    return accessibilityIntelligenceService.getStoredEconomicProfile(currentProfile.id);
+  });
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -320,6 +328,57 @@ export const UserProfileCenter: React.FC<UserProfileCenterProps> = ({
             </div>
           </div>
 
+          {/* Economic Profile & Government Schemes Card */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="font-bold text-sm text-slate-800 dark:text-white">
+                  Economic & Scheme Eligibility Profile
+                </h3>
+              </div>
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-full">
+                {economicProfile ? 'Configured' : 'General Baseline'}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Voluntary parameters used by JeevanCare to match official public schemes (AB-PMJAY, RAN, e-Kosh, PMBJP) and calculate out-of-pocket health cost burdens.
+            </p>
+
+            {economicProfile && (
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Monthly Household Income:</span>
+                  <span className="font-bold text-slate-800 dark:text-white">
+                    ₹{economicProfile.monthlyHouseholdIncome?.toLocaleString('en-IN')}/mo
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Food Security / Ration Card:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    {economicProfile.rationCardType}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Ayushman Bharat (PM-JAY):</span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                    {economicProfile.hasAyushmanCard ? 'Enrolled (₹5 Lakhs)' : 'Not Linked'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsEconomicModalOpen(true)}
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>{economicProfile ? 'Update Economic & Scheme Details' : 'Configure Voluntary Economic Profile'}</span>
+            </button>
+          </div>
+
         </div>
 
         <button
@@ -331,6 +390,15 @@ export const UserProfileCenter: React.FC<UserProfileCenterProps> = ({
         </button>
 
       </form>
+
+      {/* Economic & Scheme Affordability Modal */}
+      <EconomicAffordabilityModal
+        isOpen={isEconomicModalOpen}
+        onClose={() => setIsEconomicModalOpen(false)}
+        userId={currentProfile.id}
+        currentProfile={economicProfile}
+        onProfileUpdated={(updated) => setEconomicProfile(updated)}
+      />
 
     </div>
   );

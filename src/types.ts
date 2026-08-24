@@ -2,6 +2,14 @@ export type UserRole = 'patient' | 'doctor' | 'admin';
 export type RoleType = 'Patient' | 'Doctor';
 export type AuthMode = 'ACCOUNT' | 'DEMO' | 'LOADING' | 'SIGNED_OUT';
 
+export interface SavedGoogleAccount {
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  lastUsed: number;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -22,6 +30,10 @@ export interface UserProfile {
   abhaAddress?: string;
   abhaLinked?: boolean;
   abhaLinkedAt?: string;
+  state?: string;
+  district?: string;
+  city?: string;
+  economicProfile?: EconomicProfile;
   // Doctor specific profile fields
   registrationNumber?: string;
   medicalCouncil?: string;
@@ -314,6 +326,11 @@ export interface HealthAssistantMessage {
   imageUrl?: string;
   audioUrl?: string;
   hasRedFlags?: boolean;
+  isEmergency?: boolean;
+  voiceText?: string;
+  detectedLanguage?: 'en' | 'hi' | 'hinglish';
+  emotionDetected?: string;
+  followUpQuestion?: string;
 }
 
 export interface HomeCareGuide {
@@ -501,5 +518,203 @@ export interface DonorRequestMatch {
   notifiedAt: string;
   respondedAt?: string;
 }
+
+// ============================================================================
+// JEEVANCARE 2.0: HEALTHCARE ACCESSIBILITY & AFFORDABILITY INTELLIGENCE
+// ============================================================================
+
+export type OccupationCategory =
+  | 'Organized Sector / Salaried'
+  | 'Unorganized / Informal / Gig'
+  | 'Agriculture / Farming'
+  | 'Self-Employed / Small Business'
+  | 'Daily Wage Earner'
+  | 'Retired / Pensioner / Senior'
+  | 'Student / Homemaker'
+  | 'Unemployed';
+
+export type RationCardType =
+  | 'Antyodaya Anna Yojana (AAY - Poorest of Poor)'
+  | 'Priority Household (BPL / PHH)'
+  | 'State Food Security (NFSA)'
+  | 'Non-NFSA / Above Poverty Line (APL)'
+  | 'None / Not Applicable';
+
+export type IncomeBracket =
+  | 'Below ₹1,00,000 / year (Under ₹8.3k/mo)'
+  | '₹1,00,000 - ₹2,50,000 / year (₹8.3k - ₹20.8k/mo)'
+  | '₹2,50,000 - ₹5,00,000 / year (₹20.8k - ₹41.6k/mo)'
+  | '₹5,00,000 - ₹10,00,000 / year (₹41.6k - ₹83.3k/mo)'
+  | 'Above ₹10,00,000 / year (Above ₹83.3k/mo)';
+
+export interface EconomicProfile {
+  id: string;
+  userId: string;
+  monthlyHouseholdIncome: number; // in INR
+  annualHouseholdIncome: number; // in INR
+  incomeBracket: IncomeBracket;
+  familySize: number;
+  dependentsCount: number;
+  seniorDependentsCount: number;
+  childDependentsCount: number;
+  occupationCategory: OccupationCategory;
+  rationCardType: RationCardType;
+  areaType: 'Rural' | 'Semi-Urban' | 'Urban';
+  state: string;
+  district: string;
+  hasAyushmanCard: boolean;
+  ayushmanCardNumber?: string;
+  hasStateHealthCard: boolean;
+  stateHealthCardName?: string;
+  hasPrivateInsurance: boolean;
+  privateInsuranceSumInsured?: number;
+  hasDisabilityOrSpecialCategory: boolean;
+  specialCategoryNotes?: string;
+  consentGiven: boolean;
+  consentGivenAt: string;
+  lastUpdated: string;
+}
+
+export type SchemeCoverageCategory =
+  | 'Hospitalization & Surgeries'
+  | 'Generic Medicines & Discounts'
+  | 'Critical Illness Emergency Relief'
+  | 'Direct Financial Grant / e-Kosh'
+  | 'Elderly & Geriatric Healthcare'
+  | 'Maternal & Child Health'
+  | 'Diagnostic Subsidy';
+
+export type PotentialMatchLevel = 'Strong Potential Match' | 'Potential Match' | 'General Universal Benefit' | 'Criteria Not Met';
+
+export interface GovernmentBenefitScheme {
+  id: string;
+  code: string;
+  name: string;
+  shortName: string;
+  authority: string; // e.g. 'National Health Authority (MoHFW)' or 'Govt of Uttar Pradesh'
+  level: 'Central / National' | 'State Government' | 'Autonomous Fund';
+  applicableStates: string[]; // ['ALL'] or specific states e.g. ['Uttar Pradesh']
+  category: SchemeCoverageCategory;
+  coverageAmountDescription: string;
+  maxFinancialAssistance: number; // in INR e.g. 500000
+  incomeCeilingAnnual?: number; // max income limit if any
+  eligibleRationCards?: RationCardType[];
+  targetBeneficiaries: string[];
+  keyBenefits: string[];
+  eligibilitySummary: string[];
+  requiredDocuments: string[];
+  applicationPortalUrl: string;
+  officialHelpline: string;
+  eKoshTreasuryIntegrated?: boolean;
+  verificationMethod: string;
+  lastVerifiedDate: string;
+}
+
+export interface SchemeMatchingResult {
+  scheme: GovernmentBenefitScheme;
+  matchLevel: PotentialMatchLevel;
+  matchPercentage: number; // 0-100
+  matchingFactors: string[];
+  missingOrUnmetFactors: string[];
+  actionSteps: string[];
+  disclaimer: string;
+}
+
+export type FinancialBurdenTier = 'Low (<5%)' | 'Moderate (5-15%)' | 'High / Catastrophic (>15%)' | 'Severe (>25%)';
+
+export interface HealthFinancialBurdenAnalysis {
+  monthlyEstimatedMedsBrandedCost: number;
+  monthlyEstimatedMedsGenericCost: number;
+  monthlyEstimatedDiagnosticsCost: number;
+  monthlyEstimatedDoctorVisitsCost: number;
+  totalMonthlyEstimatedHealthcareCost: number;
+  monthlyHouseholdIncome: number;
+  burdenRatioPercentage: number;
+  burdenTier: FinancialBurdenTier;
+  monthlyPotentialGenericSavings: number;
+  annualPotentialGenericSavings: number;
+  janaushadhiAvailabilityNote: string;
+  recommendedAssistanceSchemes: SchemeMatchingResult[];
+  costMitigationStrategy: string[];
+}
+
+// ============================================================================
+// OFFICIAL BLOOD AVAILABILITY & e-RAKTKOSH TYPES
+// ============================================================================
+
+export type BloodComponentType =
+  | 'Whole Blood'
+  | 'Packed Red Blood Cells (PRBC)'
+  | 'Platelet Concentrate (RDP)'
+  | 'Single Donor Platelets (SDP)'
+  | 'Fresh Frozen Plasma (FFP)'
+  | 'Cryoprecipitate';
+
+export type FacilityTier = 'Government Medical College' | 'District Hospital Blood Bank' | 'Red Cross Society' | 'Licensed Private Blood Center' | 'Charitable Trust';
+
+export type DataFreshnessTier = 'Live Updated (<30m)' | 'Recent (<4h)' | 'Same-Day (<24h)' | 'Verification Recommended (>24h)';
+
+export interface OfficialBloodUnitRecord {
+  id: string;
+  facilityId: string;
+  facilityName: string;
+  facilityTier: FacilityTier;
+  licenseNumber: string;
+  state: string;
+  district: string;
+  city: string;
+  address: string;
+  phone: string;
+  emergencyHelpline?: string;
+  lat: number;
+  lng: number;
+  distanceKm?: number;
+  bloodGroup: BloodGroup;
+  componentType: BloodComponentType;
+  availableUnits: number;
+  stockStatus: 'Adequate Stock' | 'Low Stock' | 'Critical Shortage' | 'Out of Stock';
+  lastReportedTimestamp: string;
+  freshnessTier: DataFreshnessTier;
+  freshnessMinutes: number;
+  officialSource: 'e-RaktKosh National Portal' | 'State Blood Transfusion Council' | 'Hospital Live Feed';
+  verifiedByNodalOfficer: boolean;
+  componentProcessingCapabilities: BloodComponentType[];
+  operatingHours: string;
+  is24x7: boolean;
+}
+
+export interface BloodCompatibilityInfo {
+  bloodGroup: BloodGroup;
+  canGiveWholeBloodAndRBC: BloodGroup[];
+  canReceiveWholeBloodAndRBC: BloodGroup[];
+  canGivePlasma: BloodGroup[];
+  canReceivePlasma: BloodGroup[];
+  isUniversalRBCDonor: boolean;
+  isUniversalRBCRecipient: boolean;
+  isUniversalPlasmaDonor: boolean;
+  isUniversalPlasmaRecipient: boolean;
+  rarityDescription: string;
+}
+
+export interface AccessibilityScoreBreakdown {
+  overallScore: number; // 0-100
+  ratingTier: 'Excellent' | 'Good' | 'Moderate' | 'Vulnerable' | 'Critical Needs';
+  dimensions: {
+    affordability: { score: number; max: 30; label: string; insight: string };
+    resourceProximity: { score: number; max: 25; label: string; insight: string };
+    schemeProtection: { score: number; max: 25; label: string; insight: string };
+    emergencyReadiness: { score: number; max: 20; label: string; insight: string };
+  };
+  keyActionItems: string[];
+  generatedAt: string;
+}
+
+export interface HealthcarePathwaySelection {
+  primaryNeed: 'prescription_cost' | 'government_scheme' | 'blood_emergency' | 'doctor_specialist' | 'diagnostic_support' | 'general_guidance';
+  urgency: 'routine' | 'urgent' | 'emergency';
+  targetConditionOrMedicine?: string;
+  preferredFacilityType?: 'government' | 'janaushadhi' | 'private' | 'any';
+}
+
 
 

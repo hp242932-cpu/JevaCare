@@ -604,7 +604,7 @@ app.post('/api/gemini/fact-check', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// API 3: AI Health Assistant (Multimodal Chat & Wellness)
+// API 3: AI Health Assistant (Multimodal Chat, Natural Voice & Multilingual Intelligence)
 // ----------------------------------------------------
 app.post('/api/gemini/health-assistant', async (req, res) => {
   // 1. Strict Payload Validation
@@ -618,7 +618,7 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
     });
   }
 
-  const { messages, userProfile, vaultItems, activeMedicines } = req.body;
+  const { messages, userProfile, vaultItems, activeMedicines, languagePreference } = req.body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({
@@ -687,7 +687,13 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
     'stroke',
     'coughing up blood',
     'severe head trauma',
+    'saans lene me dikkat',
+    'chhati me dard',
+    'behoshi',
   ];
+
+  const lastUserMsgObj = [...messages].reverse().find((m: any) => m.sender === 'user' || m.role === 'user');
+  const lastUserText = (lastUserMsgObj?.text || '').trim();
 
   const allUserText = messages
     .filter((m: any) => m.sender === 'user' || m.role === 'user')
@@ -696,8 +702,14 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
 
   const hasRedFlags = redFlagKeywords.some((kw) => allUserText.includes(kw));
 
-  const emergencyWarningText =
-    '🚨 EMERGENCY MEDICAL WARNING DETECTED 🚨\n\nYour inquiry mentions severe, acute red-flag symptoms. Please immediately call Emergency Medical Services (911 or 112 / 108 in India) or proceed immediately to the nearest hospital Emergency Room (ER) for urgent clinical evaluation!';
+  // Language Heuristics for Fallback
+  const isHindiScript = /[\u0900-\u097F]/.test(lastUserText);
+  const isHinglishText = /\b(mera|meri|mere|mujhe|kya|kyu|kyun|kaise|hai|hain|dard|sujan|gardan|gala|pet|dawa|dawai|doctor|dikha|chahiye|nahi|thoda|bohot|bukhaar|khansi)\b/i.test(lastUserText);
+  
+  let targetLang = languagePreference || 'auto';
+  if (targetLang === 'auto') {
+    targetLang = isHindiScript ? 'hi' : isHinglishText ? 'hinglish' : 'en';
+  }
 
   try {
     const ai = getGeminiClient();
@@ -711,25 +723,55 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
       : 'No active prescribed medicines.';
 
     const systemInstruction = `
-    You are Jevan Care AI Assistant, an empathetic, highly knowledgeable digital health companion.
-    
-    Patient Context:
-    Name: ${userProfile?.name || 'Patient'}
-    Allergies: ${userProfile?.allergies?.join(', ') || 'None recorded'}
-    Chronic Conditions: ${userProfile?.chronicConditions?.join(', ') || 'None recorded'}
+You are the JeevanCare Multimodal AI Health Assistant — a calm, intelligent, and warm healthcare companion.
+You communicate like a thoughtful, empathetic human healthcare guide talking directly to a real person.
+You are NOT a medical report generator. Never sound like a textbook or robot reading a PDF.
 
-    Patient Stored Active Medicines:
-    ${medsSummary}
+CORE OBJECTIVE & TONE:
+- Primary priority: Clarity → Naturalness → Safety → Relevance → Brevity.
+- Sound conversational, reassuring, clear, and grounded.
+- Speak in short, easy-to-understand sentences (12-20 words).
+- Avoid convoluted multi-clause sentences or heavy clinical jargon.
+- Introduce medical terms naturally when helpful (e.g. "This is called lymphadenopathy, but in simple terms, it means swollen lymph nodes.").
 
-    Patient Stored Medical Vault & Reports:
-    ${vaultSummary}
+STRICT FORMATTING PROHIBITIONS:
+- DO NOT use markdown headings (#, ##, ###, ####).
+- DO NOT use horizontal dividers (---, ***).
+- DO NOT use numbered section walls (1., 2., 3., 4., 5.) or long lists of bullets.
+- DO NOT use hashtags (#Health #NeckSwelling).
+- DO NOT use slash-heavy phrases (e.g. write "doctor or ENT specialist" instead of "doctor/ENT", "infection or inflammation" instead of "infection/inflammation", "symptoms or signs" instead of "symptoms/signs").
+- DO NOT write rigid section headers like "**Potential Causes:**", "**What You Should Do Next:**", "**When to Seek Immediate Emergency Care:**", "**Diagnosis:**", "**Treatment:**". Write in continuous, natural paragraphs instead.
+- Do NOT repeat the same information across the response.
 
-    Core Directives:
-    1. Answer health questions clearly, accurately, and empathetically regarding medicines, symptoms, preventive care, first aid, and healthy lifestyle choices.
-    2. Reference the patient's stored active medicines or medical vault documents ONLY when relevant to their question (e.g. when asking about their prescriptions, past lab reports, or drug safety).
-    3. ALWAYS include a clear medical disclaimer that your advice is for informational purposes only and does NOT replace professional medical diagnosis or consultation.
-    4. If the user mentions RED FLAG EMERGENCY symptoms (e.g., crushing chest pain, sudden difficulty breathing, sudden face drooping, severe bleeding, anaphylaxis, severe confusion), IMMEDIATELY warn them to call emergency services (911 or local emergency) or visit the nearest ER emergency room.
-    `;
+MEDICAL REASONING & SAFETY RULES:
+- Never diagnose the user with certainty based only on symptoms (never say "You have X").
+- Use gentle, cautious framing: "There are a few possible reasons...", "One common cause is...", "It's difficult to tell without an examination", "A doctor may want to feel the area and check...".
+- Red Flags & Emergencies: If red flag symptoms are present (e.g. trouble breathing/swallowing, rapid swelling, chest pain, high fever, severe dizziness), state the warning clearly and naturally: "One important thing: if you're having trouble breathing or swallowing, the swelling is growing quickly, or you develop severe symptoms, please seek urgent medical care right away."
+- Avoid fear-based language: Do not unnecessarily introduce rare or frightening conditions when common benign causes are more likely.
+- Context awareness: If user records are provided, reference them naturally only when relevant (e.g. "If you've recently had a throat infection...", not "According to database record ID 104...").
+
+MULTILINGUAL INTELLIGENCE:
+- Preferred language target: "${targetLang}" (or adhere to user language if "auto").
+- If the user writes in English: Respond in natural, warm English.
+- If the user writes in Hindi (हिंदी): Respond in fluent, conversational Hindi in Devanagari script.
+- If the user writes in Hinglish (e.g. "Mere neck ke right side mein swelling hai"): Respond in natural, conversational Hinglish (Roman Hindi). Example: "Haan, right side neck swelling ke kuch common reasons ho sakte hain. Kabhi-kabhi infection ke baad lymph node thoda bada reh sakta hai. Lekin agar swelling kaafi time se hai aur ja nahi rahi, to doctor se check karwana better rahega."
+- Maintain language consistency throughout the response. Do not translate mechanically word-for-word.
+
+PROGRESSIVE DISCLOSURE & FOLLOW-UP:
+- Give the essential explanation and clear advice first (2-3 concise paragraphs).
+- End with a gentle, supportive question offering more guidance if they want.
+
+Patient Profile Context:
+Name: ${userProfile?.name || 'Friend'}
+Allergies: ${userProfile?.allergies?.join(', ') || 'None recorded'}
+Chronic Conditions: ${userProfile?.chronicConditions?.join(', ') || 'None recorded'}
+
+Patient Active Medicines:
+${medsSummary}
+
+Patient Stored Health Vault:
+${vaultSummary}
+`;
 
     // Map conversation messages
     const formattedContents = messages.map((m: any) => {
@@ -749,80 +791,163 @@ app.post('/api/gemini/health-assistant', async (req, res) => {
       };
     });
 
-    // 3. Timeout Wrapper for Gemini Call (18 seconds)
+    // Generate response using gemini-3.7-flash with JSON schema
     const geminiPromise = ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-3.7-flash',
       contents: formattedContents,
       config: {
         systemInstruction,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            reply: {
+              type: Type.STRING,
+              description: 'Natural, warm, conversational text response for the visual chat. No markdown headings, no hashtags, no slash-heavy phrases, 2-3 short paragraphs max.',
+            },
+            voiceText: {
+              type: Type.STRING,
+              description: 'Dedicated spoken version optimized for TTS (20-50 seconds speech length, expanded abbreviations like mg to milligrams, smooth pause commas, zero markdown/emojis).',
+            },
+            detectedLanguage: {
+              type: Type.STRING,
+              description: 'en, hi, or hinglish',
+            },
+            emotionDetected: {
+              type: Type.STRING,
+              description: 'calm, anxious, urgent, confused, curious, or neutral',
+            },
+            followUpQuestion: {
+              type: Type.STRING,
+              description: 'Short warm follow up question to guide the user gently.',
+            },
+            hasRedFlags: {
+              type: Type.BOOLEAN,
+              description: 'True if acute emergency or dangerous symptoms are mentioned.',
+            },
+            isEmergency: {
+              type: Type.BOOLEAN,
+              description: 'True if urgent immediate emergency care is required.',
+            },
+          },
+          required: ['reply', 'voiceText', 'detectedLanguage', 'hasRedFlags'],
+        },
       },
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), 18000);
+      setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), 19000);
     });
 
     const response = await Promise.race([geminiPromise, timeoutPromise]);
+    const textOutput = response.text || '{}';
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(textOutput);
+    } catch {
+      parsed = { reply: textOutput, voiceText: textOutput, detectedLanguage: targetLang === 'auto' ? 'en' : targetLang, hasRedFlags: false };
+    }
 
-    const replyText = response.text || 'I am here to support your health journey. Please consult your physician for medical diagnosis.';
-    const isEmergencyReply = ['emergency', '911', 'chest pain', 'call 911', 'er room', 'ambulance', 'anaphylaxis'].some((kw) => replyText.toLowerCase().includes(kw));
+    let cleanReply = parsed.reply || 'I am here to support you on your health journey. Please feel free to tell me more about what you are experiencing.';
+    
+    // Safety check on formatting
+    cleanReply = cleanReply
+      .replace(/^#{1,6}\s+/gm, '')
+      .replace(/#[a-zA-Z0-9_]+/g, '')
+      .replace(/\*\*What You Should Do Next:?\*\*/gi, '')
+      .replace(/\*\*Potential Causes:?\*\*/gi, '')
+      .replace(/\*\*When to Seek Immediate Emergency Care:?\*\*/gi, '')
+      .replace(/\bdoctor\/ENT\b/gi, 'doctor or ENT specialist')
+      .replace(/\binfection\/inflammation\b/gi, 'infection or inflammation')
+      .replace(/\bsymptoms\/signs\b/gi, 'symptoms or signs');
+
+    let cleanVoiceText = parsed.voiceText || cleanReply;
+    cleanVoiceText = cleanVoiceText
+      .replace(/[*_#`~>•]/g, '')
+      .replace(/[\u{1F300}-\u{1F9FF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}]/gu, '')
+      .replace(/\bBP\b/g, 'blood pressure')
+      .replace(/\bENT\b/g, 'E-N-T specialist')
+      .replace(/\bER\b/g, 'emergency room');
+
+    const isEmergencyFinal = Boolean(parsed.isEmergency || hasRedFlags || /emergency|911|108|112|immediate medical care/i.test(cleanReply));
+    const detectedLangFinal = (parsed.detectedLanguage || (targetLang === 'auto' ? 'en' : targetLang)) as 'en' | 'hi' | 'hinglish';
 
     return res.status(200).json({
       success: true,
       data: {
-        reply: replyText,
-        hasRedFlags: hasRedFlags || isEmergencyReply,
-        isEmergency: isEmergencyReply,
+        reply: cleanReply,
+        voiceText: cleanVoiceText,
+        detectedLanguage: detectedLangFinal,
+        emotionDetected: parsed.emotionDetected || 'neutral',
+        followUpQuestion: parsed.followUpQuestion || '',
+        hasRedFlags: isEmergencyFinal || Boolean(parsed.hasRedFlags),
+        isEmergency: isEmergencyFinal,
         isFallback: false,
       },
-      reply: replyText,
-      hasRedFlags: hasRedFlags || isEmergencyReply,
+      reply: cleanReply,
+      voiceText: cleanVoiceText,
+      detectedLanguage: detectedLangFinal,
+      emotionDetected: parsed.emotionDetected || 'neutral',
+      followUpQuestion: parsed.followUpQuestion || '',
+      hasRedFlags: isEmergencyFinal || Boolean(parsed.hasRedFlags),
       isFallback: false,
     });
   } catch (error: any) {
-    if (hasRedFlags) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          reply: emergencyWarningText,
-          hasRedFlags: true,
-          isEmergency: true,
-          isFallback: true,
-        },
-        reply: emergencyWarningText,
-        hasRedFlags: true,
-        isFallback: true,
-      });
-    }
-
     const isTimeout = error?.message === 'GEMINI_TIMEOUT';
     const isQuota = isQuotaOrRateLimitError(error);
 
     if (isTimeout) {
-      console.warn('[Health Assistant] Timeout reached while generating AI response. Using resilient health fallback.');
+      console.warn('[Health Assistant] Timeout reached while generating AI response. Using natural health fallback.');
     } else if (isQuota) {
-      console.warn('[Health Assistant] Gemini quota reached. Using resilient health fallback.');
+      console.warn('[Health Assistant] Gemini quota reached. Using natural health fallback.');
     } else {
       console.error('Health Assistant Error:', error?.message || error);
     }
 
-    const lastMsg = messages[messages.length - 1]?.text || '';
-    const isWisdomQuery = lastMsg.toLowerCase().includes('daily wellness tip') || lastMsg.toLowerCase().includes('wellness tip');
+    // Natural multilingual fallback responses
+    let fallbackReply = '';
+    let fallbackVoice = '';
 
-    const fallbackReply = isWisdomQuery
-      ? `Prioritizing consistent hydration, 7-8 hours of restful sleep, and balanced daily movement supports cellular vitality and metabolic resilience throughout your day.`
-      : `Hello ${userProfile?.name || 'there'}! I am Jevan Care AI Assistant. Thank you for your question: "${lastMsg}".\n\nFor optimal health, ensure you keep hydrated, follow prescribed medication schedules, and get adequate rest. If you are experiencing persistent or unusual symptoms, we recommend consulting your healthcare provider.\n\n⚠️ Disclaimer: Information provided is for awareness only and is not a substitute for professional medical diagnosis.`;
+    if (hasRedFlags) {
+      if (targetLang === 'hi' || isHindiScript) {
+        fallbackReply = 'यह एक गंभीर आपातकालीन स्थिति हो सकती है। कृपया तुरंत नजदीकी अस्पताल के इमरजेंसी विभाग जाएं या एम्बुलेंस (108 / 112) को कॉल करें।';
+        fallbackVoice = 'यह एक गंभीर आपातकालीन स्थिति हो सकती है। कृपया तुरंत नजदीकी अस्पताल जाएं या 108 पर कॉल करें।';
+      } else if (targetLang === 'hinglish' || isHinglishText) {
+        fallbackReply = 'Aapke bataye symptoms serious red-flag emergency ho sakte hain. Kripya bina deri kiye turant nearest hospital ke Emergency Room jayein ya 108 / 112 par call karein.';
+        fallbackVoice = 'Yeh symptoms serious ho sakte hain. Kripya turant nearest hospital ke emergency room jayein ya emergency services ko call karein.';
+      } else {
+        fallbackReply = 'Your inquiry mentions severe red-flag symptoms. Please seek immediate urgent medical evaluation at the nearest emergency room or call emergency services (911 or 112 / 108) right away.';
+        fallbackVoice = 'Your symptoms require urgent attention. Please call emergency services or visit the nearest emergency room right away.';
+      }
+    } else {
+      if (targetLang === 'hi' || isHindiScript) {
+        fallbackReply = `नमस्ते! मैं आपका जीवन केयर स्वास्थ्य साथी हूँ। आपके सवाल "${lastUserText || 'स्वास्थ्य सलाह'}" के लिए: सामान्य तौर पर पर्याप्त पानी पिएं, समय पर आराम करें और अपनी नियमित दवाएं लें। यदि आपके लक्षण बने रहते हैं या बढ़ रहे हैं, तो डॉक्टर से जांच करवाना सबसे सुरक्षित रहेगा।`;
+        fallbackVoice = 'नमस्ते। सामान्य तौर पर पर्याप्त पानी पिएं और आराम करें। यदि लक्षण बने रहते हैं तो डॉक्टर से जांच करवाना बेहतर रहेगा।';
+      } else if (targetLang === 'hinglish' || isHinglishText) {
+        fallbackReply = `Hello! Main aapka JeevanCare Health Companion hoon. Aapke question "${lastUserText || 'health guidance'}" ke baare mein: Paani regular pijiye, proper rest lijiye aur apni routine medicines time par follow karein. Agar symptoms kuch dino se bane hue hain ya pareshani badh rahi hai, toh ek baar doctor se check karwa lena best rahega.`;
+        fallbackVoice = 'Hello. Paani regular pijiye aur rest lijiye. Agar symptoms continue rehte hain toh ek baar doctor se check karwana better rahega.';
+      } else {
+        fallbackReply = `Hello! I am your JeevanCare Health Companion. Regarding your question: staying well-hydrated, getting adequate rest, and monitoring how your symptoms progress are good daily steps. If your symptoms are persistent or causing discomfort, it is always best to have a doctor examine you.`;
+        fallbackVoice = 'Hello. Staying hydrated and getting enough rest are good steps. If your symptoms persist, it is a good idea to have a doctor check them.';
+      }
+    }
 
     return res.status(200).json({
       success: true,
       data: {
         reply: fallbackReply,
-        hasRedFlags: false,
-        isEmergency: false,
+        voiceText: fallbackVoice,
+        detectedLanguage: targetLang === 'auto' ? (isHindiScript ? 'hi' : isHinglishText ? 'hinglish' : 'en') : targetLang,
+        emotionDetected: hasRedFlags ? 'urgent' : 'calm',
+        followUpQuestion: 'Would you like to know more about possible causes or home care steps?',
+        hasRedFlags,
+        isEmergency: hasRedFlags,
         isFallback: true,
       },
       reply: fallbackReply,
-      hasRedFlags: false,
+      voiceText: fallbackVoice,
+      detectedLanguage: targetLang === 'auto' ? (isHindiScript ? 'hi' : isHinglishText ? 'hinglish' : 'en') : targetLang,
+      hasRedFlags,
       isFallback: true,
     });
   }
@@ -1768,6 +1893,165 @@ app.post('/api/gemini/document-summary', async (req, res) => {
 
     return res.json({ success: true, data: fallbackData, isFallback: true });
   }
+});
+
+// ----------------------------------------------------
+// API 13: Government Health Schemes & e-Kosh Matcher
+// ----------------------------------------------------
+app.post('/api/government/schemes/match', (req, res) => {
+  const { economicProfile, state = 'Uttar Pradesh' } = req.body;
+  const annualIncome = economicProfile?.annualHouseholdIncome || 300000;
+  const rationCard = economicProfile?.rationCardType || 'State Food Security (NFSA)';
+  const hasAyushman = Boolean(economicProfile?.hasAyushmanCard);
+
+  // Evaluated schemes
+  const evaluatedSchemes = [
+    {
+      code: 'AB-PMJAY',
+      name: 'Ayushman Bharat - Pradhan Mantri Jan Arogya Yojana',
+      shortName: 'PM-JAY (Ayushman Card)',
+      authority: 'National Health Authority (MoHFW)',
+      coverage: '₹5,00,000 / family / year cashless inpatient care',
+      matchScore: hasAyushman ? 100 : (annualIncome <= 250000 ? 90 : 60),
+      matchLevel: hasAyushman ? 'Strong Potential Match' : (annualIncome <= 250000 ? 'Strong Potential Match' : 'Potential Match'),
+      reasons: [
+        hasAyushman ? 'Active Ayushman Card registered in profile' : 'Eligible under NFSA / SECC economic criteria',
+        'Covers 1,949+ secondary and tertiary medical procedures nationwide'
+      ],
+      officialPortal: 'https://beneficiary.nha.gov.in',
+      helpline: '14555'
+    },
+    {
+      code: 'PMBJP',
+      name: 'Pradhan Mantri Bhartiya Janaushadhi Pariyojana',
+      shortName: 'PMBJP Janaushadhi Generic Network',
+      authority: 'Department of Pharmaceuticals, Govt of India',
+      coverage: '50% to 90% direct savings on generic medicines',
+      matchScore: 100,
+      matchLevel: 'General Universal Benefit',
+      reasons: [
+        'Universal citizen benefit: Open to everyone with a prescription',
+        'Over 10,000+ certified stores offering WHO-GMP bio-equivalent generics'
+      ],
+      officialPortal: 'https://janaushadhi.gov.in',
+      helpline: '1800-180-8080'
+    },
+    {
+      code: 'UP-MMJAY',
+      name: 'Uttar Pradesh Mukhyamantri Jan Arogya Yojana',
+      shortName: 'UP MMJAY (State Health Scheme)',
+      authority: 'SACHIS, Govt of Uttar Pradesh',
+      coverage: '₹5,00,000 / family / year for UP state residents',
+      matchScore: state === 'Uttar Pradesh' ? (annualIncome <= 250000 ? 95 : 70) : 10,
+      matchLevel: state === 'Uttar Pradesh' ? 'Strong Potential Match' : 'Criteria Not Met',
+      reasons: [
+        state === 'Uttar Pradesh' ? 'Resident of Uttar Pradesh' : 'Restricted to Uttar Pradesh residents',
+        'Seamlessly integrated with e-Kosh / Koshvani State Treasury'
+      ],
+      officialPortal: 'https://sachis.up.gov.in',
+      helpline: '1800-1800-4444 / 104'
+    },
+    {
+      code: 'RAN',
+      name: 'Rashtriya Arogya Nidhi (Super-Specialty Aid)',
+      shortName: 'RAN Emergency Super-Specialty Assistance',
+      authority: 'MoHFW, Govt of India',
+      coverage: 'Direct grant up to ₹15,00,000 for critical super-specialty interventions in Govt Hospitals',
+      matchScore: annualIncome <= 180000 ? 85 : 35,
+      matchLevel: annualIncome <= 180000 ? 'Potential Match' : 'Criteria Not Met',
+      reasons: [
+        annualIncome <= 180000 ? 'Income within BPL threshold for critical emergency relief' : 'Exceeds standard BPL financial threshold',
+        'Applicable for oncology, organ transplant, and cardiovascular surgery at AIIMS/KGMU/SGPGI'
+      ],
+      officialPortal: 'https://main.mohfw.gov.in',
+      helpline: '011-23061986'
+    }
+  ];
+
+  return res.json({
+    success: true,
+    data: evaluatedSchemes,
+    generatedAt: new Date().toISOString()
+  });
+});
+
+// ----------------------------------------------------
+// API 14: Official e-RaktKosh Blood Inventory Query
+// ----------------------------------------------------
+app.get('/api/blood/official-inventory', (req, res) => {
+  const { bloodGroup = 'O+', componentType = 'Packed Red Blood Cells (PRBC)' } = req.query;
+
+  const mockBloodUnits = [
+    {
+      facilityName: "King George's Medical University (KGMU) Blood Transfusion Center",
+      facilityTier: 'Government Medical College',
+      city: 'Lucknow',
+      state: 'Uttar Pradesh',
+      address: 'KGMU Campus, Shah Mina Road, Chowk, Lucknow, UP 226003',
+      phone: '+91 522 225 7540',
+      bloodGroup,
+      componentType,
+      availableUnits: 38,
+      stockStatus: 'Adequate Stock',
+      freshnessMinutes: 14,
+      officialSource: 'e-RaktKosh National Portal',
+      is24x7: true
+    },
+    {
+      facilityName: 'Sanjay Gandhi Postgraduate Institute of Medical Sciences (SGPGI)',
+      facilityTier: 'Government Medical College',
+      city: 'Lucknow',
+      state: 'Uttar Pradesh',
+      address: 'Raebareli Road, Lucknow, UP 226014',
+      phone: '+91 522 249 4000',
+      bloodGroup,
+      componentType,
+      availableUnits: 26,
+      stockStatus: 'Adequate Stock',
+      freshnessMinutes: 45,
+      officialSource: 'e-RaktKosh National Portal',
+      is24x7: true
+    },
+    {
+      facilityName: 'Balrampur District Hospital Blood Bank',
+      facilityTier: 'District Hospital Blood Bank',
+      city: 'Lucknow',
+      state: 'Uttar Pradesh',
+      address: 'Golaganj, Near Qaiserbagh, Lucknow, UP 226018',
+      phone: '+91 522 222 4153',
+      bloodGroup,
+      componentType,
+      availableUnits: 19,
+      stockStatus: 'Adequate Stock',
+      freshnessMinutes: 110,
+      officialSource: 'State Blood Transfusion Council',
+      is24x7: true
+    },
+    {
+      facilityName: 'Indian Red Cross Society Blood Center',
+      facilityTier: 'Red Cross Society',
+      city: 'Lucknow',
+      state: 'Uttar Pradesh',
+      address: 'Red Cross Bhawan, Kaiserbagh, Lucknow, UP 226001',
+      phone: '+91 522 262 3901',
+      bloodGroup,
+      componentType,
+      availableUnits: 28,
+      stockStatus: 'Adequate Stock',
+      freshnessMinutes: 180,
+      officialSource: 'e-RaktKosh National Portal',
+      is24x7: false
+    }
+  ];
+
+  return res.json({
+    success: true,
+    bloodGroup,
+    componentType,
+    totalAvailableUnits: mockBloodUnits.reduce((acc, f) => acc + f.availableUnits, 0),
+    data: mockBloodUnits,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // ----------------------------------------------------

@@ -58,6 +58,9 @@ const AdminAuditPanel = lazy(() =>
 const BloodDonationNetwork = lazy(() =>
   import('./components/blood/BloodDonationNetwork').then((m) => ({ default: m.BloodDonationNetwork }))
 );
+const HealthcareAccessibilityCenter = lazy(() =>
+  import('./components/accessibility/HealthcareAccessibilityCenter').then((m) => ({ default: m.HealthcareAccessibilityCenter }))
+);
 const EmergencyHubModal = lazy(() =>
   import('./components/emergency/EmergencyHubModal').then((m) => ({ default: m.EmergencyHubModal }))
 );
@@ -79,8 +82,11 @@ import {
   VaultItem,
   HealthMetricLog,
   Reminder,
-  RoleType
+  RoleType,
+  EconomicProfile
 } from './types';
+
+import { accessibilityIntelligenceService } from './services/accessibilityIntelligenceService';
 
 import {
   supabaseAuth,
@@ -120,6 +126,9 @@ export function App() {
   // Core State - Isolated between Demo & Account
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     return authProfile || initialProfile;
+  });
+  const [economicProfile, setEconomicProfile] = useState<EconomicProfile | null>(() => {
+    return accessibilityIntelligenceService.getStoredEconomicProfile(initialProfile.id);
   });
   const [activeMedicines, setActiveMedicines] = useState<ActiveMedicine[]>(initialActiveMedicines);
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
@@ -364,7 +373,7 @@ export function App() {
               />
             ) : (
               <>
-                {(activeTab === 'dashboard' || activeTab === 'home' || !['scanner', 'medicine', 'care', 'doctors', 'map', 'rumor', 'assistant', 'ai', 'progress', 'lifestyle', 'vault', 'records', 'profile', 'blood-donation', 'admin'].includes(activeTab)) && (
+                {(activeTab === 'dashboard' || activeTab === 'home' || !['scanner', 'medicine', 'care', 'doctors', 'map', 'rumor', 'assistant', 'ai', 'progress', 'lifestyle', 'vault', 'records', 'profile', 'blood-donation', 'admin', 'intelligence', 'accessibility', 'schemes'].includes(activeTab)) && (
                   <Dashboard
                     profile={userProfile}
                     activeMedicines={activeMedicines}
@@ -373,9 +382,22 @@ export function App() {
                     riskAlerts={riskAlerts}
                     reminders={reminders}
                     metricLogs={metricLogs}
+                    economicProfile={economicProfile}
                     setActiveTab={setActiveTab}
                     onOpenEmergency={handleOpenEmergency}
                     onMarkDoseTaken={handleMarkDoseTaken}
+                  />
+                )}
+
+                {(activeTab === 'intelligence' || activeTab === 'accessibility' || activeTab === 'schemes') && (
+                  <HealthcareAccessibilityCenter
+                    userProfile={userProfile}
+                    activeMedicines={activeMedicines}
+                    appointments={appointments}
+                    vaultItems={vaultItems}
+                    economicProfile={economicProfile}
+                    onUpdateEconomicProfile={setEconomicProfile}
+                    onNavigateTab={setActiveTab}
                   />
                 )}
 

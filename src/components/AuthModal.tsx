@@ -17,6 +17,7 @@ import { UserProfile, UserRole } from '../types';
 import { auditLogger } from '../services/AuditLogger';
 import { useAuth } from '../context/AuthContext';
 import { JevanCareLoader } from './common/JevanCareLoader';
+import { GoogleAccountChooserModal } from './auth/GoogleAccountChooserModal';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -61,6 +62,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [message, setMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showGoogleChooser, setShowGoogleChooser] = useState(false);
 
   if (!isOpen) return null;
 
@@ -109,19 +111,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleGoogleAuth = async () => {
+  const handleGoogleAuth = () => {
+    setMessage('');
+    setShowGoogleChooser(true);
+  };
+
+  const handleGoogleAccountSelected = async (selected: { id?: string; email: string; name?: string }) => {
     setIsLoading(true);
     try {
-      const { success, error } = await signInWithGoogle();
+      const { success, error } = await signInWithGoogle(selected);
       if (!success) {
         setMessage(error || 'Google Sign-In could not be initialized.');
         setIsSuccess(false);
       } else {
         setIsSuccess(true);
         setMessage('Google authentication session active. Redirecting...');
+        setShowGoogleChooser(false);
         setTimeout(() => {
           onClose();
-        }, 1000);
+        }, 800);
       }
     } catch (err: any) {
       setMessage(err.message || 'Google authentication failed.');
@@ -384,6 +392,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         </div>
       </div>
+
+      <GoogleAccountChooserModal
+        isOpen={showGoogleChooser}
+        onClose={() => setShowGoogleChooser(false)}
+        onSelectAccount={handleGoogleAccountSelected}
+        isLoading={isLoading}
+      />
     </div>
   );
 };

@@ -14,7 +14,7 @@ export interface AuthContextType {
   profile: UserProfile | null;
   authError: string | null;
   signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
-  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  signInWithGoogle: (selectedAccount?: { email: string; name?: string; id?: string }) => Promise<{ success: boolean; error?: string }>;
   signUp: (email: string, pass: string, name: string, role?: UserRole) => Promise<{ success: boolean; error?: string; user?: any }>;
   resetPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   signOut: () => Promise<void>;
@@ -198,11 +198,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithGoogle = useCallback(async (selectedAccount?: { email: string; name?: string; id?: string }) => {
     setAuthError(null);
     setAuthMode('LOADING');
     try {
-      const res = await supabaseAuth.signInWithGoogle();
+      const res = await supabaseAuth.signInWithGoogle(selectedAccount);
       if (res.error) {
         setAuthError(res.error);
         setAuthMode('SIGNED_OUT');

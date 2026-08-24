@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { JevanCareLoader } from '../common/JevanCareLoader';
 import { UserRole } from '../../types';
+import { GoogleAccountChooserModal } from './GoogleAccountChooserModal';
 
 const GoogleLogoSvg = () => (
   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -67,6 +68,7 @@ export const AuthScreen: React.FC = () => {
   // Status states
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [showGoogleChooser, setShowGoogleChooser] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -86,17 +88,26 @@ export const AuthScreen: React.FC = () => {
 
   const passwordStrength = getPasswordStrength(password);
 
-  // Primary Google Fast-Login Handler
-  const handleGoogleAuth = async () => {
+  // Primary Google Fast-Login Handler: Opens Account Chooser
+  const handleGoogleAuth = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    clearAuthError();
+    setShowGoogleChooser(true);
+  };
+
+  const handleGoogleAccountSelected = async (selected: { id?: string; email: string; name?: string }) => {
     setErrorMessage(null);
     setSuccessMessage(null);
     clearAuthError();
     setIsGoogleLoading(true);
 
     try {
-      const res = await signInWithGoogle();
+      const res = await signInWithGoogle(selected);
       if (!res.success) {
         setErrorMessage(res.error || 'Google Sign-In could not be completed.');
+      } else {
+        setShowGoogleChooser(false);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'An unexpected error occurred during Google authentication.');
@@ -996,6 +1007,14 @@ export const AuthScreen: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Google Account Chooser & Switcher Modal */}
+      <GoogleAccountChooserModal
+        isOpen={showGoogleChooser}
+        onClose={() => setShowGoogleChooser(false)}
+        onSelectAccount={handleGoogleAccountSelected}
+        isLoading={isGoogleLoading}
+      />
 
     </div>
   );

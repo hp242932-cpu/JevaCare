@@ -242,13 +242,13 @@ export const AIInsightsWidget: React.FC<AIInsightsWidgetProps> = React.memo(({
             </div>
 
             {/* Weekly Highlights */}
-            {insights.weeklyHighlights && insights.weeklyHighlights.length > 0 && (
+            {Array.isArray(insights.weeklyHighlights) && insights.weeklyHighlights.length > 0 && (
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
                 <p className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2">
                   Key Weekly Milestones & Achievements
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {insights.weeklyHighlights.map((hl, idx) => (
+                  {(insights.weeklyHighlights || []).map((hl, idx) => (
                     <div key={idx} className="flex items-start gap-2 bg-emerald-50/60 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-100/60 dark:border-emerald-900/40">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                       <span className="text-xs text-slate-700 dark:text-slate-200 font-medium leading-snug">
@@ -276,7 +276,7 @@ export const AIInsightsWidget: React.FC<AIInsightsWidgetProps> = React.memo(({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {insights.trends.map((trend, idx) => (
+              {(insights.trends || []).map((trend, idx) => (
                 <div
                   key={idx}
                   className="bg-white/90 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-700 transition-all space-y-3"

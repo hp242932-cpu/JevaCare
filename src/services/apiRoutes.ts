@@ -47,6 +47,7 @@ export interface HealthAssistantMessageInput {
 
 export interface HealthAssistantRequest {
   messages: HealthAssistantMessageInput[];
+  languagePreference?: 'en' | 'hi' | 'hinglish' | 'auto';
   userProfile?: {
     id?: string;
     name?: string;
@@ -78,6 +79,10 @@ export interface HealthAssistantRequest {
 
 export interface HealthAssistantData {
   reply: string;
+  voiceText?: string;
+  detectedLanguage?: 'en' | 'hi' | 'hinglish';
+  emotionDetected?: string;
+  followUpQuestion?: string;
   hasRedFlags: boolean;
   isEmergency?: boolean;
   isFallback?: boolean;
@@ -87,6 +92,10 @@ export interface HealthAssistantResponse {
   success: boolean;
   data?: HealthAssistantData;
   reply?: string;
+  voiceText?: string;
+  detectedLanguage?: 'en' | 'hi' | 'hinglish';
+  emotionDetected?: string;
+  followUpQuestion?: string;
   hasRedFlags?: boolean;
   isFallback?: boolean;
   error?: ApiErrorEnvelope;

@@ -34,11 +34,14 @@ import {
   VaultItem,
   RiskAlert,
   Reminder,
-  HealthMetricLog
+  HealthMetricLog,
+  EconomicProfile
 } from '../../types';
 import { LocalHealthAlertsSection } from './LocalHealthAlertsSection';
 import { DailyWellnessWisdom } from './DailyWellnessWisdom';
 import { AIInsightsWidget } from './AIInsightsWidget';
+import { AccessibilityIntelligenceCard } from './AccessibilityIntelligenceCard';
+import { OfficialBloodStockCard } from './OfficialBloodStockCard';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -48,6 +51,7 @@ interface DashboardProps {
   riskAlerts: RiskAlert[];
   reminders: Reminder[];
   metricLogs?: HealthMetricLog[];
+  economicProfile?: EconomicProfile | null;
   setActiveTab: (tab: string) => void;
   onOpenEmergency: () => void;
   onMarkDoseTaken: (medId: string) => void;
@@ -61,6 +65,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   riskAlerts = [],
   reminders = [],
   metricLogs = [],
+  economicProfile = null,
   setActiveTab,
   onOpenEmergency,
   onMarkDoseTaken,
@@ -327,6 +332,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       )}
+
+      {/* =========================================================================
+          HEALTHCARE ACCESSIBILITY & AFFORDABILITY INTELLIGENCE SPOTLIGHT
+          ========================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-w-0">
+        <div className="lg:col-span-8">
+          <AccessibilityIntelligenceCard
+            userProfile={profile}
+            activeMedicines={safeActiveMedicines}
+            economicProfile={economicProfile}
+            onNavigateTab={setActiveTab}
+          />
+        </div>
+        <div className="lg:col-span-4">
+          <OfficialBloodStockCard
+            userProfile={profile}
+            onNavigateTab={setActiveTab}
+          />
+        </div>
+      </div>
 
       {/* =========================================================================
           PRIMARY FOCUS GRID: Daily Medications & Upcoming Appointments

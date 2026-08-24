@@ -26,6 +26,7 @@ import { auditLogger } from '../../services/AuditLogger';
 import { supabaseVault } from '../../services/supabaseService';
 import { JevanCareLoader } from '../common/JevanCareLoader';
 import { DocumentSummaryModal } from './DocumentSummaryModal';
+import { useAuth } from '../../context/AuthContext';
 
 interface MedicalVaultProps {
   vaultItems: VaultItem[];
@@ -40,6 +41,8 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
   onAddVaultItem,
   onDeleteVaultItem,
 }) => {
+  const { user, profile: authProfile } = useAuth();
+  const activeUserId = profile?.id || authProfile?.id || user?.id || 'demo_pat_001';
   const safeVaultItems = vaultItems || [];
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -190,7 +193,7 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
         setUploadStatusText('Uploading to Supabase Storage...');
 
         // Upload to Supabase Storage
-        const storageUrl = await supabaseVault.uploadDocumentToStorage('current_user', selectedFile);
+        const storageUrl = await supabaseVault.uploadDocumentToStorage(activeUserId, selectedFile);
         uploadedUrl = storageUrl || fileBase64;
       }
 
@@ -241,7 +244,7 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
       };
 
       // Persist to Supabase DB
-      await supabaseVault.addVaultItem('current_user', newItem);
+      await supabaseVault.addVaultItem(activeUserId, newItem);
 
       onAddVaultItem(newItem);
       auditLogger.logAction(
@@ -305,7 +308,7 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
     }
 
     try {
-      await supabaseVault.deleteVaultItem('current_user', item.id);
+      await supabaseVault.deleteVaultItem(activeUserId, item.id);
       if (onDeleteVaultItem) {
         onDeleteVaultItem(item.id);
       }

@@ -15,24 +15,73 @@ import {
   VerifiedBloodOrganization,
   BloodRequest,
   BloodGroup,
-  AvailabilityStatus
+  AvailabilityStatus,
+  SavedGoogleAccount
 } from '../types';
 import { initialDoctors } from '../data/initialData';
 import { auditLogger } from './AuditLogger';
 
-// Local storage backup keys for offline / disconnected operation
-const STORAGE_KEYS = {
-  PROFILE: 'jeevancare_supabase_profile_cache',
-  MEDICINES: 'jeevancare_supabase_medicines_cache',
-  VAULT: 'jeevancare_supabase_vault_cache',
-  APPOINTMENTS: 'jeevancare_supabase_appointments_cache',
-  METRICS: 'jeevancare_supabase_metrics_cache',
-  REMINDERS: 'jeevancare_supabase_reminders_cache',
+// Helper for user-scoped cache keys to guarantee zero cross-account data leakage
+export function getUserCacheKey(domain: string, userId: string): string {
+  const safeId = (userId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `jeevancare_${domain}_${safeId}`;
+}
+
+// Global registry keys
+const GLOBAL_KEYS = {
+  REGISTERED_ACCOUNTS: 'jeevancare_registered_accounts',
+  ACTIVE_SESSION: 'jeevancare_active_session',
+  SAVED_GOOGLE_ACCOUNTS: 'jeevancare_saved_google_accounts',
   DOCTORS: 'jeevancare_supabase_doctors_cache',
-  BLOOD_DONOR: 'jeevancare_supabase_blood_donor_cache',
   BLOOD_REQUESTS: 'jeevancare_supabase_blood_requests_cache',
   BLOOD_ORGS: 'jeevancare_supabase_blood_orgs_cache',
 };
+
+// ============================================================================
+// GOOGLE SAVED ACCOUNTS REGISTRY (Device-Level Multi-Account Switcher)
+// ============================================================================
+
+export function getSavedGoogleAccounts(): SavedGoogleAccount[] {
+  try {
+    const raw = localStorage.getItem(GLOBAL_KEYS.SAVED_GOOGLE_ACCOUNTS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveGoogleAccount(acc: { email: string; name?: string; id?: string; avatar?: string }): SavedGoogleAccount {
+  const existing = getSavedGoogleAccounts();
+  const cleanEmail = acc.email.toLowerCase().trim();
+  const cleanName = acc.name?.trim() || cleanEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const cleanId = acc.id || `usr_google_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
+
+  const filtered = existing.filter((a) => a.email.toLowerCase() !== cleanEmail);
+  const updated: SavedGoogleAccount = {
+    id: cleanId,
+    email: cleanEmail,
+    name: cleanName,
+    avatar: acc.avatar || '',
+    lastUsed: Date.now(),
+  };
+
+  localStorage.setItem(GLOBAL_KEYS.SAVED_GOOGLE_ACCOUNTS, JSON.stringify([updated, ...filtered]));
+  return updated;
+}
+
+export function removeSavedGoogleAccount(email: string): SavedGoogleAccount[] {
+  try {
+    const existing = getSavedGoogleAccounts();
+    const clean = email.toLowerCase().trim();
+    const filtered = existing.filter((a) => a.email.toLowerCase() !== clean);
+    localStorage.setItem(GLOBAL_KEYS.SAVED_GOOGLE_ACCOUNTS, JSON.stringify(filtered));
+    return filtered;
+  } catch {
+    return [];
+  }
+}
 
 // ============================================================================
 // 1. AUTHENTICATION SERVICES
@@ -40,77 +89,199 @@ const STORAGE_KEYS = {
 
 export const supabaseAuth = {
   async signUp(email: string, pass: string, name: string, role: UserRole = 'patient') {
-    if (!isSupabaseConfigured) {
-      return { user: { id: `u_${Date.now()}`, email, name, role }, error: null };
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { user: null, session: null, error: 'Please provide a valid email address.' };
+    }
+    if (!pass || pass.length < 6) {
+      return { user: null, session: null, error: 'Password must be at least 6 characters long.' };
+    }
+    if (!cleanName) {
+      return { user: null, session: null, error: 'Please enter your full legal name.' };
     }
 
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: pass,
-        options: {
-          data: { name, role },
-        },
-      });
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: pass,
+          options: {
+            data: { name: cleanName, role },
+          },
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      if (data.user) {
-        // Create matching database profile
-        await supabaseProfile.upsertProfile({
-          id: data.user.id,
-          name,
-          email,
+        if (data.user) {
+          // Create matching database profile in Supabase
+          const newProfile: UserProfile = {
+            id: data.user.id,
+            name: cleanName,
+            email: cleanEmail,
+            role,
+            bloodGroup: 'O+',
+            allergies: [],
+            chronicConditions: [],
+            emergencyContacts: [],
+            isEmergencySharingEnabled: true,
+          };
+          await supabaseProfile.upsertProfile(newProfile);
+
+          auditLogger.logAction(
+            'USER_SIGNUP',
+            `Created new Supabase health account for ${cleanEmail} with role ${role}.`,
+            { id: data.user.id, name: cleanEmail, role },
+            'SUCCESS'
+          );
+        }
+
+        return { user: data.user, session: data.session, error: null };
+      } catch (err: any) {
+        console.warn('Supabase Auth SignUp Error:', err.message);
+        return { user: null, session: null, error: err.message || 'Failed to create account in Supabase.' };
+      }
+    } else {
+      // Local Auth Provider for offline & local preview
+      try {
+        const accountsRaw = localStorage.getItem(GLOBAL_KEYS.REGISTERED_ACCOUNTS);
+        const accounts: Array<{ id: string; email: string; passHash: string; name: string; role: UserRole; createdAt: string }> = accountsRaw ? JSON.parse(accountsRaw) : [];
+
+        const existing = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+        if (existing) {
+          return { user: null, session: null, error: 'An account with this email address already exists. Please sign in instead.' };
+        }
+
+        const userId = `usr_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+        const newUserRecord = {
+          id: userId,
+          email: cleanEmail,
+          passHash: btoa(pass),
+          name: cleanName,
+          role,
+          createdAt: new Date().toISOString(),
+        };
+
+        accounts.push(newUserRecord);
+        localStorage.setItem(GLOBAL_KEYS.REGISTERED_ACCOUNTS, JSON.stringify(accounts));
+
+        const authUser = {
+          id: userId,
+          email: cleanEmail,
+          user_metadata: { name: cleanName, full_name: cleanName, role },
+        };
+
+        const session = {
+          access_token: `token_${userId}_${Date.now()}`,
+          user: authUser,
+          expires_at: Date.now() + 86400000 * 7,
+        };
+
+        localStorage.setItem(GLOBAL_KEYS.ACTIVE_SESSION, JSON.stringify(session));
+
+        const newProfile: UserProfile = {
+          id: userId,
+          name: cleanName,
+          email: cleanEmail,
           role,
           bloodGroup: 'O+',
           allergies: [],
           chronicConditions: [],
+          emergencyContacts: [],
           isEmergencySharingEnabled: true,
-        });
+        };
+        await supabaseProfile.upsertProfile(newProfile);
 
         auditLogger.logAction(
           'USER_SIGNUP',
-          `Created new Supabase account for ${email} with role ${role}.`,
-          { id: data.user.id, name: email, role },
+          `Registered new account for ${cleanEmail} (${role}).`,
+          { id: userId, name: cleanEmail, role },
           'SUCCESS'
         );
-      }
 
-      return { user: data.user, error: null };
-    } catch (err: any) {
-      console.warn('Supabase Auth SignUp Error:', err.message);
-      return { user: null, error: err.message || 'Failed to sign up.' };
+        window.dispatchEvent(new CustomEvent('jeevancare-auth-change', { detail: { event: 'SIGNED_IN', session } }));
+
+        return { user: authUser, session, error: null };
+      } catch (err: any) {
+        return { user: null, session: null, error: err.message || 'Failed to create account.' };
+      }
     }
   },
 
   async signIn(email: string, pass: string) {
-    if (!isSupabaseConfigured) {
-      return { user: { id: 'u1', email, name: 'Aarav Sharma', role: 'patient' }, error: null };
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !pass) {
+      return { user: null, session: null, error: 'Please enter both email address and password.' };
     }
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: pass,
-      });
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: pass,
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      auditLogger.logAction(
-        'USER_LOGIN',
-        `Supabase authentication successful for ${email}.`,
-        { id: data.user?.id, name: email },
-        'SUCCESS'
-      );
+        auditLogger.logAction(
+          'USER_LOGIN',
+          `Supabase authentication successful for ${cleanEmail}.`,
+          { id: data.user?.id, name: cleanEmail },
+          'SUCCESS'
+        );
 
-      return { user: data.user, session: data.session, error: null };
-    } catch (err: any) {
-      console.warn('Supabase Auth SignIn Error:', err.message);
-      return { user: null, session: null, error: err.message || 'Invalid login credentials.' };
+        return { user: data.user, session: data.session, error: null };
+      } catch (err: any) {
+        console.warn('Supabase Auth SignIn Error:', err.message);
+        return { user: null, session: null, error: err.message || 'Invalid email or password. Please verify your credentials.' };
+      }
+    } else {
+      // Local Auth Provider
+      try {
+        const accountsRaw = localStorage.getItem(GLOBAL_KEYS.REGISTERED_ACCOUNTS);
+        const accounts: Array<{ id: string; email: string; passHash: string; name: string; role: UserRole }> = accountsRaw ? JSON.parse(accountsRaw) : [];
+
+        const found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+        if (!found) {
+          return { user: null, session: null, error: 'No account found with this email address. Please sign up first.' };
+        }
+
+        if (found.passHash !== btoa(pass)) {
+          return { user: null, session: null, error: 'Incorrect password. Please verify and try again.' };
+        }
+
+        const authUser = {
+          id: found.id,
+          email: found.email,
+          user_metadata: { name: found.name, full_name: found.name, role: found.role },
+        };
+
+        const session = {
+          access_token: `token_${found.id}_${Date.now()}`,
+          user: authUser,
+          expires_at: Date.now() + 86400000 * 7,
+        };
+
+        localStorage.setItem(GLOBAL_KEYS.ACTIVE_SESSION, JSON.stringify(session));
+
+        auditLogger.logAction(
+          'USER_LOGIN',
+          `User ${cleanEmail} logged in successfully.`,
+          { id: found.id, name: cleanEmail },
+          'SUCCESS'
+        );
+
+        window.dispatchEvent(new CustomEvent('jeevancare-auth-change', { detail: { event: 'SIGNED_IN', session } }));
+
+        return { user: authUser, session, error: null };
+      } catch (err: any) {
+        return { user: null, session: null, error: err.message || 'Authentication error.' };
+      }
     }
   },
 
-  async signInWithGoogle() {
+  async signInWithGoogle(selectedAccount?: { email: string; name?: string; id?: string }) {
     try {
       const redirectTo = window.location.origin;
       if (isSupabaseConfigured) {
@@ -127,20 +298,49 @@ export const supabaseAuth = {
         if (error) throw error;
         auditLogger.logAction(
           'GOOGLE_AUTH_INITIATED',
-          'Redirecting to Google OAuth authentication.',
+          'Redirecting to Google OAuth with account selection prompt.',
           {},
           'SUCCESS'
         );
         return { data, error: null };
       } else {
-        // Fallback for local preview without environment variables
-        const mockGoogleId = `usr_google_${Date.now().toString(36)}`;
+        // Multi-Account Google Provider for local & preview mode
+        let googleEmail = selectedAccount?.email?.trim().toLowerCase();
+        let googleName = selectedAccount?.name?.trim();
+        let googleId = selectedAccount?.id;
+
+        // If no account explicitly chosen, check saved accounts
+        if (!googleEmail) {
+          const saved = getSavedGoogleAccounts();
+          if (saved.length > 0) {
+            // User can select from saved accounts
+            const primary = saved[0];
+            googleEmail = primary.email;
+            googleName = primary.name;
+            googleId = primary.id;
+          } else {
+            googleEmail = 'health.user@gmail.com';
+            googleName = 'Google Health User';
+            googleId = `usr_google_${Date.now().toString(36)}`;
+          }
+        }
+
+        if (!googleId) {
+          googleId = `usr_google_${googleEmail.replace(/[^a-z0-9]/g, '_')}`;
+        }
+        if (!googleName) {
+          googleName = googleEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        }
+
+        // Save to browser Google Account Switcher list
+        saveGoogleAccount({ id: googleId, email: googleEmail, name: googleName });
+
         const mockGoogleUser = {
-          id: mockGoogleId,
-          email: 'hp242932@gmail.com',
+          id: googleId,
+          email: googleEmail,
           user_metadata: {
-            name: 'Google Health User',
-            full_name: 'Google Health User',
+            name: googleName,
+            full_name: googleName,
             role: 'patient',
             provider: 'google',
           },
@@ -150,26 +350,41 @@ export const supabaseAuth = {
           },
         };
 
-        await supabaseProfile.upsertProfile({
-          id: mockGoogleId,
-          name: 'Google Health User',
-          email: 'hp242932@gmail.com',
-          role: 'patient',
-          bloodGroup: 'O+',
-          allergies: [],
-          chronicConditions: [],
-          emergencyContacts: [],
-          isEmergencySharingEnabled: true,
-        });
+        const session = {
+          access_token: `token_${googleId}_${Date.now()}`,
+          user: mockGoogleUser,
+          expires_at: Date.now() + 86400000 * 7,
+        };
+
+        localStorage.setItem(GLOBAL_KEYS.ACTIVE_SESSION, JSON.stringify(session));
+
+        // Ensure user profile exists
+        let prof = await supabaseProfile.fetchProfile(googleId);
+        if (!prof) {
+          prof = {
+            id: googleId,
+            name: googleName,
+            email: googleEmail,
+            role: 'patient',
+            bloodGroup: 'O+',
+            allergies: [],
+            chronicConditions: [],
+            emergencyContacts: [],
+            isEmergencySharingEnabled: true,
+          };
+          await supabaseProfile.upsertProfile(prof);
+        }
 
         auditLogger.logAction(
           'GOOGLE_AUTH_LOGIN',
-          'Google OAuth simulated authentication session active.',
-          { email: 'hp242932@gmail.com', role: 'patient' },
+          `Google OAuth authentication session established for ${googleEmail}.`,
+          { email: googleEmail, role: 'patient', id: googleId },
           'SUCCESS'
         );
 
-        return { user: mockGoogleUser, session: { user: mockGoogleUser }, error: null };
+        window.dispatchEvent(new CustomEvent('jeevancare-auth-change', { detail: { event: 'SIGNED_IN', session } }));
+
+        return { user: mockGoogleUser, session, error: null };
       }
     } catch (err: any) {
       console.warn('Google Sign-In Error:', err.message);
@@ -178,52 +393,101 @@ export const supabaseAuth = {
   },
 
   async signOut() {
-    if (!isSupabaseConfigured) return { error: null };
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      auditLogger.logAction('USER_LOGOUT', 'User signed out from Supabase Auth.', {}, 'SUCCESS');
-      return { error: null };
-    } catch (err: any) {
-      return { error: err.message };
+    localStorage.removeItem(GLOBAL_KEYS.ACTIVE_SESSION);
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err: any) {
+        console.warn('Supabase signout warning:', err);
+      }
     }
+    auditLogger.logAction('USER_LOGOUT', 'User signed out from session.', {}, 'SUCCESS');
+    window.dispatchEvent(new CustomEvent('jeevancare-auth-change', { detail: { event: 'SIGNED_OUT', session: null } }));
+    return { error: null };
   },
 
   async getCurrentSession() {
-    if (!isSupabaseConfigured) return null;
+    if (isSupabaseConfigured) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session) return data.session;
+      } catch {
+        // fallback
+      }
+    }
+
     try {
-      const { data } = await supabase.auth.getSession();
-      return data.session;
+      const raw = localStorage.getItem(GLOBAL_KEYS.ACTIVE_SESSION);
+      if (!raw) return null;
+      const session = JSON.parse(raw);
+      if (session?.user?.id) {
+        return session;
+      }
+      return null;
     } catch {
       return null;
     }
   },
 
   async resetPasswordForEmail(email: string) {
-    if (!isSupabaseConfigured) {
-      return { message: `Demo password reset link dispatched to ${email}`, error: null };
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      return { message: null, error: 'Please enter your registered email address.' };
     }
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/#reset-password`,
-      });
-      if (error) throw error;
+
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: `${window.location.origin}/#reset-password`,
+        });
+        if (error) throw error;
+        auditLogger.logAction(
+          'PASSWORD_RESET_REQUESTED',
+          `Password reset email sent to ${cleanEmail}.`,
+          { name: cleanEmail },
+          'SUCCESS'
+        );
+        return { message: `Password reset link sent to ${cleanEmail}. Please check your inbox.`, error: null };
+      } catch (err: any) {
+        return { message: null, error: err.message || 'Failed to send password reset link.' };
+      }
+    } else {
       auditLogger.logAction(
         'PASSWORD_RESET_REQUESTED',
-        `Password reset email sent to ${email}.`,
-        { name: email },
+        `Password reset requested for ${cleanEmail}.`,
+        { name: cleanEmail },
         'SUCCESS'
       );
-      return { message: `Password reset link sent to ${email}. Please check your inbox.`, error: null };
-    } catch (err: any) {
-      return { message: null, error: err.message || 'Failed to send password reset link.' };
+      return { message: `Password reset instructions dispatched to ${cleanEmail}.`, error: null };
     }
   },
 
   onAuthStateChange(callback: (event: string, session: any) => void) {
-    if (!isSupabaseConfigured) return { unsubscribe: () => {} };
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
-    return subscription;
+    let sub: any = null;
+    if (isSupabaseConfigured) {
+      try {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(callback);
+        sub = subscription;
+      } catch (err) {
+        console.warn('Could not attach Supabase auth listener:', err);
+      }
+    }
+
+    const handleCustomAuth = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        callback(customEvent.detail.event, customEvent.detail.session);
+      }
+    };
+
+    window.addEventListener('jeevancare-auth-change', handleCustomAuth);
+
+    return {
+      unsubscribe: () => {
+        if (sub?.unsubscribe) sub.unsubscribe();
+        window.removeEventListener('jeevancare-auth-change', handleCustomAuth);
+      },
+    };
   },
 };
 
@@ -233,8 +497,9 @@ export const supabaseAuth = {
 
 export const supabaseProfile = {
   async fetchProfile(userId: string): Promise<UserProfile | null> {
+    const cacheKey = getUserCacheKey('profile', userId);
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.PROFILE);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : null;
     }
 
@@ -266,28 +531,32 @@ export const supabaseProfile = {
           abhaAddress: data.abha_address,
           abhaLinked: data.abha_linked ?? false,
         };
-        localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(formatted));
+        localStorage.setItem(cacheKey, JSON.stringify(formatted));
         return formatted;
       }
       return null;
     } catch (err) {
       console.warn('Supabase profile fetch error, using local cache:', err);
-      const cached = localStorage.getItem(STORAGE_KEYS.PROFILE);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : null;
     }
   },
 
   async fetchProfileByEmail(email: string): Promise<UserProfile | null> {
     if (!email) return null;
+    const cleanEmail = email.toLowerCase().trim();
+
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.PROFILE);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (parsed.email?.toLowerCase() === email.toLowerCase()) return parsed;
-        } catch {
-          // ignore
+      try {
+        const accountsRaw = localStorage.getItem(GLOBAL_KEYS.REGISTERED_ACCOUNTS);
+        const accounts: Array<any> = accountsRaw ? JSON.parse(accountsRaw) : [];
+        const found = accounts.find((a) => a.email.toLowerCase() === cleanEmail);
+        if (found) {
+          const profCache = localStorage.getItem(getUserCacheKey('profile', found.id));
+          if (profCache) return JSON.parse(profCache);
         }
+      } catch {
+        // ignore
       }
       return null;
     }
@@ -296,7 +565,7 @@ export const supabaseProfile = {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .ilike('email', email)
+        .ilike('email', cleanEmail)
         .maybeSingle();
 
       if (error) throw error;
@@ -330,7 +599,8 @@ export const supabaseProfile = {
   },
 
   async upsertProfile(profile: UserProfile): Promise<boolean> {
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    const cacheKey = getUserCacheKey('profile', profile.id);
+    localStorage.setItem(cacheKey, JSON.stringify(profile));
 
     if (!isSupabaseConfigured) return true;
 
@@ -371,8 +641,9 @@ export const supabaseProfile = {
 
 export const supabaseMedicines = {
   async fetchActiveMedicines(userId: string): Promise<ActiveMedicine[]> {
+    const cacheKey = getUserCacheKey('medicines', userId);
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.MEDICINES);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
 
@@ -402,18 +673,22 @@ export const supabaseMedicines = {
           refillRequired: d.refill_required,
           prescribedFor: d.prescribed_for,
         }));
-        localStorage.setItem(STORAGE_KEYS.MEDICINES, JSON.stringify(meds));
+        localStorage.setItem(cacheKey, JSON.stringify(meds));
         return meds;
       }
       return [];
     } catch (err) {
       console.warn('Failed to fetch medicines from Supabase:', err);
-      const cached = localStorage.getItem(STORAGE_KEYS.MEDICINES);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
   },
 
   async addMedicine(userId: string, med: ActiveMedicine): Promise<boolean> {
+    const cacheKey = getUserCacheKey('medicines', userId);
+    const existing = await this.fetchActiveMedicines(userId);
+    localStorage.setItem(cacheKey, JSON.stringify([med, ...existing]));
+
     if (!isSupabaseConfigured) return true;
 
     try {
@@ -447,8 +722,9 @@ export const supabaseMedicines = {
 
 export const supabaseVault = {
   async fetchVaultItems(userId: string): Promise<VaultItem[]> {
+    const cacheKey = getUserCacheKey('vault', userId);
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.VAULT);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
 
@@ -477,18 +753,22 @@ export const supabaseVault = {
           sharedExpiry: d.shared_expiry,
           isImportant: d.is_important,
         }));
-        localStorage.setItem(STORAGE_KEYS.VAULT, JSON.stringify(items));
+        localStorage.setItem(cacheKey, JSON.stringify(items));
         return items;
       }
       return [];
     } catch (err) {
       console.warn('Failed to fetch vault items from Supabase:', err);
-      const cached = localStorage.getItem(STORAGE_KEYS.VAULT);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
   },
 
   async addVaultItem(userId: string, item: VaultItem): Promise<boolean> {
+    const cacheKey = getUserCacheKey('vault', userId);
+    const existing = await this.fetchVaultItems(userId);
+    localStorage.setItem(cacheKey, JSON.stringify([item, ...existing]));
+
     if (!isSupabaseConfigured) return true;
 
     try {
@@ -516,11 +796,12 @@ export const supabaseVault = {
   },
 
   async deleteVaultItem(userId: string, itemId: string): Promise<boolean> {
-    const cached = localStorage.getItem(STORAGE_KEYS.VAULT);
+    const cacheKey = getUserCacheKey('vault', userId);
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const parsed: VaultItem[] = JSON.parse(cached);
       const filtered = parsed.filter((i) => i.id !== itemId);
-      localStorage.setItem(STORAGE_KEYS.VAULT, JSON.stringify(filtered));
+      localStorage.setItem(cacheKey, JSON.stringify(filtered));
     }
 
     if (!isSupabaseConfigured) return true;
@@ -577,8 +858,9 @@ export const supabaseVault = {
 
 export const supabaseAppointments = {
   async fetchAppointments(userId: string): Promise<Appointment[]> {
+    const cacheKey = getUserCacheKey('appointments', userId);
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
 
@@ -606,18 +888,22 @@ export const supabaseAppointments = {
           notes: d.notes,
           prescriptionsShared: d.prescriptions_shared || [],
         }));
-        localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(apps));
+        localStorage.setItem(cacheKey, JSON.stringify(apps));
         return apps;
       }
       return [];
     } catch (err) {
       console.warn('Failed to fetch appointments from Supabase:', err);
-      const cached = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
   },
 
   async createAppointment(userId: string, app: Appointment): Promise<boolean> {
+    const cacheKey = getUserCacheKey('appointments', userId);
+    const existing = await this.fetchAppointments(userId);
+    localStorage.setItem(cacheKey, JSON.stringify([app, ...existing]));
+
     if (!isSupabaseConfigured) return true;
 
     try {
@@ -650,8 +936,9 @@ export const supabaseAppointments = {
 
 export const supabaseHealthMetrics = {
   async fetchMetricLogs(userId: string): Promise<HealthMetricLog[]> {
+    const cacheKey = getUserCacheKey('metrics', userId);
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.METRICS);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
 
@@ -679,18 +966,22 @@ export const supabaseHealthMetrics = {
           symptoms: d.symptoms || [],
           notes: d.notes,
         }));
-        localStorage.setItem(STORAGE_KEYS.METRICS, JSON.stringify(logs));
+        localStorage.setItem(cacheKey, JSON.stringify(logs));
         return logs;
       }
       return [];
     } catch (err) {
       console.warn('Failed to fetch metric logs from Supabase:', err);
-      const cached = localStorage.getItem(STORAGE_KEYS.METRICS);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
   },
 
   async addMetricLog(userId: string, log: HealthMetricLog): Promise<boolean> {
+    const cacheKey = getUserCacheKey('metrics', userId);
+    const existing = await this.fetchMetricLogs(userId);
+    localStorage.setItem(cacheKey, JSON.stringify([log, ...existing]));
+
     if (!isSupabaseConfigured) return true;
 
     try {
@@ -724,7 +1015,7 @@ export const supabaseHealthMetrics = {
 export const supabaseDoctors = {
   async fetchDoctors(): Promise<Doctor[]> {
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.DOCTORS);
+      const cached = localStorage.getItem(GLOBAL_KEYS.DOCTORS);
       if (cached) {
         try {
           return JSON.parse(cached);
@@ -732,7 +1023,7 @@ export const supabaseDoctors = {
           // fallback
         }
       }
-      localStorage.setItem(STORAGE_KEYS.DOCTORS, JSON.stringify(initialDoctors));
+      localStorage.setItem(GLOBAL_KEYS.DOCTORS, JSON.stringify(initialDoctors));
       return initialDoctors;
     }
 
@@ -780,17 +1071,17 @@ export const supabaseDoctors = {
           reviewsCount: d.reviews_count || 0,
         }));
 
-        localStorage.setItem(STORAGE_KEYS.DOCTORS, JSON.stringify(doctors));
+        localStorage.setItem(GLOBAL_KEYS.DOCTORS, JSON.stringify(doctors));
         return doctors;
       }
 
       // If database returns 0 rows, use cached initial verified doctors
-      const cached = localStorage.getItem(STORAGE_KEYS.DOCTORS);
+      const cached = localStorage.getItem(GLOBAL_KEYS.DOCTORS);
       const fallback = cached ? JSON.parse(cached) : initialDoctors;
       return fallback;
     } catch (err) {
       console.warn('Failed to fetch doctors from Supabase, using cached records:', err);
-      const cached = localStorage.getItem(STORAGE_KEYS.DOCTORS);
+      const cached = localStorage.getItem(GLOBAL_KEYS.DOCTORS);
       return cached ? JSON.parse(cached) : initialDoctors;
     }
   },
@@ -812,7 +1103,7 @@ export const supabaseDoctors = {
     // Update local cache
     const current = await this.fetchDoctors();
     const updated = [fullDoc, ...current.filter((d) => d.id !== docId)];
-    localStorage.setItem(STORAGE_KEYS.DOCTORS, JSON.stringify(updated));
+    localStorage.setItem(GLOBAL_KEYS.DOCTORS, JSON.stringify(updated));
 
     if (!isSupabaseConfigured) return fullDoc;
 
@@ -854,7 +1145,7 @@ export const supabaseDoctors = {
   },
 
   async updateDoctorVerification(doctorId: string, status: DoctorVerificationStatus): Promise<boolean> {
-    const cached = localStorage.getItem(STORAGE_KEYS.DOCTORS);
+    const cached = localStorage.getItem(GLOBAL_KEYS.DOCTORS);
     if (cached) {
       try {
         const parsed: Doctor[] = JSON.parse(cached);
@@ -863,7 +1154,7 @@ export const supabaseDoctors = {
             ? { ...d, verificationStatus: status, verified: status === 'VERIFIED' }
             : d
         );
-        localStorage.setItem(STORAGE_KEYS.DOCTORS, JSON.stringify(updated));
+        localStorage.setItem(GLOBAL_KEYS.DOCTORS, JSON.stringify(updated));
       } catch (err) {
         console.warn('Cache update error:', err);
       }
@@ -889,14 +1180,14 @@ export const supabaseDoctors = {
   },
 
   async updateDoctorOnlineStatus(doctorId: string, status: DoctorOnlineStatus): Promise<boolean> {
-    const cached = localStorage.getItem(STORAGE_KEYS.DOCTORS);
+    const cached = localStorage.getItem(GLOBAL_KEYS.DOCTORS);
     if (cached) {
       try {
         const parsed: Doctor[] = JSON.parse(cached);
         const updated = parsed.map((d) =>
           d.id === doctorId ? { ...d, onlineStatus: status, lastActiveAt: new Date().toISOString() } : d
         );
-        localStorage.setItem(STORAGE_KEYS.DOCTORS, JSON.stringify(updated));
+        localStorage.setItem(GLOBAL_KEYS.DOCTORS, JSON.stringify(updated));
       } catch (err) {
         console.warn('Cache update error:', err);
       }
@@ -958,7 +1249,8 @@ export const supabaseDoctors = {
 
 export const supabaseBloodDonation = {
   async fetchDonorProfile(userId: string): Promise<BloodDonor | null> {
-    const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_DONOR);
+    const cacheKey = getUserCacheKey('blood_donor', userId);
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
         const parsed: BloodDonor = JSON.parse(cached);
@@ -1003,7 +1295,7 @@ export const supabaseBloodDonation = {
         updatedAt: data.updated_at,
       };
 
-      localStorage.setItem(STORAGE_KEYS.BLOOD_DONOR, JSON.stringify(donor));
+      localStorage.setItem(cacheKey, JSON.stringify(donor));
       return donor;
     } catch (err) {
       console.warn('Failed to fetch blood donor profile from Supabase:', err);
@@ -1012,7 +1304,8 @@ export const supabaseBloodDonation = {
   },
 
   async upsertDonorProfile(donor: BloodDonor): Promise<BloodDonor> {
-    localStorage.setItem(STORAGE_KEYS.BLOOD_DONOR, JSON.stringify(donor));
+    const cacheKey = getUserCacheKey('blood_donor', donor.user_id);
+    localStorage.setItem(cacheKey, JSON.stringify(donor));
 
     auditLogger.logAction(
       'BLOOD_DONOR_REGISTER',
@@ -1056,7 +1349,8 @@ export const supabaseBloodDonation = {
     userId: string,
     settings: { notificationsPaused?: boolean; availability?: AvailabilityStatus; isActive?: boolean }
   ): Promise<boolean> {
-    const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_DONOR);
+    const cacheKey = getUserCacheKey('blood_donor', userId);
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
         const parsed: BloodDonor = JSON.parse(cached);
@@ -1066,7 +1360,7 @@ export const supabaseBloodDonation = {
             ...settings,
             updatedAt: new Date().toISOString(),
           };
-          localStorage.setItem(STORAGE_KEYS.BLOOD_DONOR, JSON.stringify(updated));
+          localStorage.setItem(cacheKey, JSON.stringify(updated));
         }
       } catch (e) {
         console.warn('Donor cache update error:', e);
@@ -1095,7 +1389,8 @@ export const supabaseBloodDonation = {
   },
 
   async leaveNetwork(userId: string): Promise<boolean> {
-    localStorage.removeItem(STORAGE_KEYS.BLOOD_DONOR);
+    const cacheKey = getUserCacheKey('blood_donor', userId);
+    localStorage.removeItem(cacheKey);
 
     auditLogger.logAction(
       'BLOOD_DONOR_LEAVE',
@@ -1121,7 +1416,7 @@ export const supabaseBloodDonation = {
   },
 
   async fetchVerifiedOrganizations(): Promise<VerifiedBloodOrganization[]> {
-    const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_ORGS);
+    const cached = localStorage.getItem(GLOBAL_KEYS.BLOOD_ORGS);
     if (cached) {
       try {
         return JSON.parse(cached);
@@ -1132,7 +1427,7 @@ export const supabaseBloodDonation = {
 
   async fetchMatchedRequests(bloodGroup?: BloodGroup, city?: string, state?: string): Promise<BloodRequest[]> {
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_REQUESTS);
+      const cached = localStorage.getItem(GLOBAL_KEYS.BLOOD_REQUESTS);
       if (cached) {
         try {
           const parsed: BloodRequest[] = JSON.parse(cached);
@@ -1178,20 +1473,20 @@ export const supabaseBloodDonation = {
           status: d.status,
           createdAt: d.created_at,
         }));
-        localStorage.setItem(STORAGE_KEYS.BLOOD_REQUESTS, JSON.stringify(reqs));
+        localStorage.setItem(GLOBAL_KEYS.BLOOD_REQUESTS, JSON.stringify(reqs));
         return reqs;
       }
 
       return [];
     } catch (err) {
       console.warn('Failed to fetch blood requests from Supabase:', err);
-      const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_REQUESTS);
+      const cached = localStorage.getItem(GLOBAL_KEYS.BLOOD_REQUESTS);
       return cached ? JSON.parse(cached) : [];
     }
   },
 
   async createOrgBloodRequest(req: BloodRequest): Promise<boolean> {
-    const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_REQUESTS);
+    const cached = localStorage.getItem(GLOBAL_KEYS.BLOOD_REQUESTS);
     let list: BloodRequest[] = [];
     if (cached) {
       try {
@@ -1199,7 +1494,7 @@ export const supabaseBloodDonation = {
       } catch (e) {}
     }
     list = [req, ...list];
-    localStorage.setItem(STORAGE_KEYS.BLOOD_REQUESTS, JSON.stringify(list));
+    localStorage.setItem(GLOBAL_KEYS.BLOOD_REQUESTS, JSON.stringify(list));
 
     if (!isSupabaseConfigured) return true;
 
@@ -1232,12 +1527,12 @@ export const supabaseBloodDonation = {
   },
 
   async updateBloodRequestStatus(requestId: string, status: 'OPEN' | 'FULFILLED' | 'CANCELLED'): Promise<boolean> {
-    const cached = localStorage.getItem(STORAGE_KEYS.BLOOD_REQUESTS);
+    const cached = localStorage.getItem(GLOBAL_KEYS.BLOOD_REQUESTS);
     if (cached) {
       try {
         const parsed: BloodRequest[] = JSON.parse(cached);
         const updated = parsed.map((r) => (r.id === requestId ? { ...r, status } : r));
-        localStorage.setItem(STORAGE_KEYS.BLOOD_REQUESTS, JSON.stringify(updated));
+        localStorage.setItem(GLOBAL_KEYS.BLOOD_REQUESTS, JSON.stringify(updated));
       } catch (e) {}
     }
 
@@ -1276,8 +1571,9 @@ export const supabaseBloodDonation = {
 
 export const supabaseReminders = {
   async fetchReminders(userId: string): Promise<Reminder[]> {
+    const cacheKey = getUserCacheKey('reminders', userId);
     if (!isSupabaseConfigured) {
-      const cached = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
 
@@ -1300,18 +1596,19 @@ export const supabaseReminders = {
           daysOfWeek: d.days_of_week || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
           instructions: d.instructions || undefined,
         }));
-        localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify(rems));
+        localStorage.setItem(cacheKey, JSON.stringify(rems));
         return rems;
       }
       return [];
     } catch (err) {
       console.warn('Failed to fetch reminders from Supabase:', err);
-      const cached = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+      const cached = localStorage.getItem(cacheKey);
       return cached ? JSON.parse(cached) : [];
     }
   },
 
   async createReminder(userId: string, reminder: Omit<Reminder, 'id'> & { id?: string }): Promise<Reminder | null> {
+    const cacheKey = getUserCacheKey('reminders', userId);
     const localId = reminder.id || `rem_${Date.now()}`;
     const newRem: Reminder = {
       id: localId,
@@ -1325,7 +1622,7 @@ export const supabaseReminders = {
 
     // Update local cache
     const current = await this.fetchReminders(userId);
-    localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify([...current, newRem]));
+    localStorage.setItem(cacheKey, JSON.stringify([...current, newRem]));
 
     if (!isSupabaseConfigured) return newRem;
 
@@ -1365,12 +1662,13 @@ export const supabaseReminders = {
   },
 
   async updateReminder(userId: string, reminderId: string, updates: Partial<Reminder>): Promise<boolean> {
-    const cached = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+    const cacheKey = getUserCacheKey('reminders', userId);
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
         const parsed: Reminder[] = JSON.parse(cached);
         const updated = parsed.map((r) => (r.id === reminderId ? { ...r, ...updates } : r));
-        localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify(updated));
+        localStorage.setItem(cacheKey, JSON.stringify(updated));
       } catch (e) {
         console.warn('Reminder cache update error:', e);
       }
@@ -1402,12 +1700,13 @@ export const supabaseReminders = {
   },
 
   async deleteReminder(userId: string, reminderId: string): Promise<boolean> {
-    const cached = localStorage.getItem(STORAGE_KEYS.REMINDERS);
+    const cacheKey = getUserCacheKey('reminders', userId);
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
         const parsed: Reminder[] = JSON.parse(cached);
         const filtered = parsed.filter((r) => r.id !== reminderId);
-        localStorage.setItem(STORAGE_KEYS.REMINDERS, JSON.stringify(filtered));
+        localStorage.setItem(cacheKey, JSON.stringify(filtered));
       } catch (e) {
         console.warn('Reminder cache deletion error:', e);
       }
@@ -1441,7 +1740,11 @@ export const supabaseReminders = {
 
 export const supabaseAssistantMessages = {
   async fetchMessages(userId: string, limit = 50): Promise<HealthAssistantMessage[]> {
-    if (!isSupabaseConfigured) return [];
+    const cacheKey = getUserCacheKey('assistant_messages', userId);
+    if (!isSupabaseConfigured) {
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : [];
+    }
 
     try {
       const { data, error } = await supabase
@@ -1454,7 +1757,7 @@ export const supabaseAssistantMessages = {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        return data.map((d: any) => ({
+        const msgs = data.map((d: any) => ({
           id: d.id,
           sender: d.sender,
           text: d.text,
@@ -1464,15 +1767,22 @@ export const supabaseAssistantMessages = {
             ? new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }));
+        localStorage.setItem(cacheKey, JSON.stringify(msgs));
+        return msgs;
       }
       return [];
     } catch (err) {
       console.warn('Failed to fetch assistant messages from Supabase:', err);
-      return [];
+      const cached = localStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : [];
     }
   },
 
   async saveMessage(userId: string, msg: HealthAssistantMessage): Promise<boolean> {
+    const cacheKey = getUserCacheKey('assistant_messages', userId);
+    const existing = await this.fetchMessages(userId);
+    localStorage.setItem(cacheKey, JSON.stringify([...existing, msg]));
+
     if (!isSupabaseConfigured) return true;
 
     try {
@@ -1494,6 +1804,9 @@ export const supabaseAssistantMessages = {
   },
 
   async clearMessages(userId: string): Promise<boolean> {
+    const cacheKey = getUserCacheKey('assistant_messages', userId);
+    localStorage.removeItem(cacheKey);
+
     if (!isSupabaseConfigured) return true;
 
     try {

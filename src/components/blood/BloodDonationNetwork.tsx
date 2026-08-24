@@ -98,7 +98,8 @@ export const BloodDonationNetwork: React.FC<BloodDonationNetworkProps> = ({
   const loadNetworkData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const donor = await supabaseBloodDonation.fetchDonorProfile(userProfile.id || 'current_user');
+      const activeId = userProfile?.id || 'usr_anonymous';
+      const donor = await supabaseBloodDonation.fetchDonorProfile(activeId);
       const orgs = await supabaseBloodDonation.fetchVerifiedOrganizations();
       
       if (!isMountedRef.current) return;
@@ -130,7 +131,7 @@ export const BloodDonationNetwork: React.FC<BloodDonationNetworkProps> = ({
         setIsLoading(false);
       }
     }
-  }, [userProfile.id]);
+  }, [userProfile?.id]);
 
   useEffect(() => {
     loadNetworkData();
@@ -164,7 +165,7 @@ export const BloodDonationNetwork: React.FC<BloodDonationNetworkProps> = ({
 
     const newDonor: BloodDonor = {
       id: donorProfile?.id || `bd_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-      user_id: userProfile.id || 'current_user',
+      user_id: userProfile?.id || 'usr_anonymous',
       fullName: fullName.trim(),
       email: email.trim(),
       phone: phone.trim() || undefined,
@@ -369,6 +370,21 @@ export const BloodDonationNetwork: React.FC<BloodDonationNetworkProps> = ({
               <Building className="w-3.5 h-3.5 text-stone-300" />
               <span>For Verified Medical Entities</span>
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Official Blood Bank vs Volunteer Donor Distinction Advisory */}
+      <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+        <div className="flex items-start gap-2.5">
+          <ShieldCheck className="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-extrabold uppercase tracking-wider text-[11px] text-amber-800 dark:text-amber-300 block">
+              Official Data Integrity Notice (Source Distinction)
+            </span>
+            <p className="text-[11px] text-amber-800 dark:text-amber-300/90 mt-0.5">
+              This module manages <strong>private volunteer donors</strong>. For verified, live unit counts in government storage facilities (e-RaktKosh), visit the <strong>Official Blood Availability</strong> registry. Volunteer counts and licensed storage inventories are strictly separated.
+            </p>
           </div>
         </div>
       </div>
