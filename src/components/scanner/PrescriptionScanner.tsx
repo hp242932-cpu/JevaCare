@@ -478,39 +478,39 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-stone-200 dark:border-slate-700 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shrink-0">
+      <div className="bg-white dark:bg-[#16241c] rounded-3xl p-6 sm:p-8 border border-[#e6dfd3] dark:border-[#283c2e] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center shrink-0 border border-[#d2ded0] dark:border-[#2a4435]">
             <ScanLine className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-              AI Prescription Scanner & Lowest Price Finder
+            <h2 className="text-xl sm:text-2xl font-bold text-[#142b20] dark:text-[#f2f0e8] font-serif-editorial">
+              AI Prescription Scanner & Medicine Finder
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] mt-0.5">
               Extract accurate medicine details from prescriptions, confirm handwritten entries, and compare real verified prices at nearby medical stores.
             </p>
           </div>
         </div>
 
         {/* View Mode Switcher */}
-        <div className="flex bg-stone-100 dark:bg-slate-900 p-1 rounded-xl border border-stone-200 dark:border-slate-700 text-xs font-bold shrink-0">
+        <div className="flex bg-[#f6f2e9] dark:bg-[#1d2e23] p-1.5 rounded-2xl border border-[#e6dfd3] dark:border-[#283c2e] text-xs sm:text-sm font-bold shrink-0">
           <button
             onClick={() => setActiveTabMode('scanner')}
-            className={`px-4 py-2 rounded-lg transition-all ${
+            className={`min-h-[40px] px-4 py-2 rounded-xl transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
               activeTabMode === 'scanner'
-                ? 'bg-white dark:bg-slate-800 text-emerald-800 dark:text-emerald-300 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                ? 'bg-white dark:bg-[#16241c] text-[#1a5336] dark:text-[#a3d4b6] shadow-xs'
+                : 'text-[#5c5647] dark:text-[#c0b9ad] hover:text-[#142b20]'
             }`}
           >
             1. Scan & Confirm
           </button>
           <button
             onClick={() => setActiveTabMode('price_comparison')}
-            className={`px-4 py-2 rounded-lg transition-all ${
+            className={`min-h-[40px] px-4 py-2 rounded-xl transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
               activeTabMode === 'price_comparison'
-                ? 'bg-white dark:bg-slate-800 text-emerald-800 dark:text-emerald-300 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                ? 'bg-white dark:bg-[#16241c] text-[#1a5336] dark:text-[#a3d4b6] shadow-xs'
+                : 'text-[#5c5647] dark:text-[#c0b9ad] hover:text-[#142b20]'
             }`}
           >
             2. Verified Prices & Map ({pharmacySearchData?.medicineResults?.length || 0})
@@ -851,11 +851,11 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
           </div>
 
           {/* Extracted Clinical Results & User Confirmation */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-stone-200 dark:border-slate-700 shadow-xs space-y-4">
-            <h3 className="font-bold text-sm text-slate-800 dark:text-white flex items-center justify-between">
+          <div className="bg-white dark:bg-[#16241c] rounded-3xl p-6 sm:p-7 border border-[#e6dfd3] dark:border-[#283c2e] shadow-xs space-y-5">
+            <h3 className="font-bold text-sm sm:text-base text-[#142b20] dark:text-[#f2f0e8] flex items-center justify-between">
               <span>2. AI Extracted Clinical Results</span>
               {scanResult && (
-                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                <span className="text-xs font-bold text-[#1a5336] dark:text-[#a3d4b6] bg-[#e8eee5] dark:bg-[#23382b] px-3 py-1 rounded-full border border-[#d2ded0] dark:border-[#2a4435]">
                   {scanResult.medicines.length} Medicines Identified
                 </span>
               )}
@@ -864,22 +864,22 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
             {scanResult ? (
               <div className="space-y-4">
                 {/* Doctor & Hospital Info Header */}
-                <div className="p-4 rounded-xl bg-stone-50 dark:bg-slate-900/60 border border-stone-200 dark:border-slate-700 grid grid-cols-2 gap-3 text-xs">
+                <div className="p-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#283c2e] grid grid-cols-2 gap-3 text-xs sm:text-sm">
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
+                    <span className="text-[#827b6c] dark:text-[#969082] block text-xs font-bold uppercase tracking-wider">
                       Prescribing Doctor
                     </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1 mt-0.5">
-                      <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
+                    <span className="font-bold text-[#142b20] dark:text-[#f2f0e8] flex items-center gap-1.5 mt-0.5">
+                      <UserCheck className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                       {scanResult.doctorName}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
+                    <span className="text-[#827b6c] dark:text-[#969082] block text-xs font-bold uppercase tracking-wider">
                       Hospital / Clinic
                     </span>
-                    <span className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1 mt-0.5">
-                      <Building className="w-3.5 h-3.5 text-indigo-500" />
+                    <span className="font-bold text-[#142b20] dark:text-[#f2f0e8] flex items-center gap-1.5 mt-0.5">
+                      <Building className="w-4 h-4 text-[#1a5336] dark:text-[#a3d4b6]" />
                       {scanResult.hospitalName}
                     </span>
                   </div>
@@ -887,7 +887,7 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
 
                 {/* Extracted Medicines List */}
                 <div className="space-y-3">
-                  <h4 className="font-bold text-xs uppercase text-slate-400 tracking-wider">
+                  <h4 className="font-bold text-xs uppercase text-[#827b6c] dark:text-[#969082] tracking-wider">
                     Extracted Medicines Breakdown
                   </h4>
 
@@ -899,53 +899,53 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
                         key={idx}
                         className={`p-4 rounded-2xl border transition-all space-y-2 ${
                           m.isUnclear
-                            ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800'
-                            : 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900'
+                            ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800'
+                            : 'bg-[#fcfaf6] dark:bg-[#1d2e23] border-[#e6dfd3] dark:border-[#283c2e]'
                         }`}
                       >
                         {isEditing && editMedForm ? (
                           /* Inline Medicine Confirmation / Edit Form */
-                          <div className="space-y-3 bg-white dark:bg-slate-900 p-4 rounded-xl border border-amber-300">
-                            <div className="flex items-center justify-between text-xs font-bold text-amber-800">
+                          <div className="space-y-3 bg-white dark:bg-[#16241c] p-4 rounded-xl border border-amber-300">
+                            <div className="flex items-center justify-between text-xs font-bold text-amber-800 dark:text-amber-300">
                               <span>Confirm Medicine Details</span>
                               <span>Step 2 of 2</span>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
                               <div>
-                                <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Medicine Name</label>
+                                <label className="block text-xs text-[#5c5647] dark:text-[#c0b9ad] font-bold mb-1">Medicine Name</label>
                                 <input
                                   type="text"
                                   value={editMedForm.name}
                                   onChange={(e) => setEditMedForm({ ...editMedForm, name: e.target.value })}
-                                  className="w-full p-2 border rounded-lg text-xs font-semibold"
+                                  className="w-full p-2.5 bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-xl text-xs sm:text-sm font-semibold text-[#142b20] dark:text-[#f2f0e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                                 />
                               </div>
                               <div>
-                                <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Active Salt / Ingredient</label>
+                                <label className="block text-xs text-[#5c5647] dark:text-[#c0b9ad] font-bold mb-1">Active Salt / Ingredient</label>
                                 <input
                                   type="text"
                                   value={editMedForm.activeIngredient || ''}
                                   onChange={(e) => setEditMedForm({ ...editMedForm, activeIngredient: e.target.value, salt: e.target.value })}
-                                  className="w-full p-2 border rounded-lg text-xs font-semibold"
+                                  className="w-full p-2.5 bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-xl text-xs sm:text-sm font-semibold text-[#142b20] dark:text-[#f2f0e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                                 />
                               </div>
                               <div>
-                                <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Strength (e.g. 650 mg)</label>
+                                <label className="block text-xs text-[#5c5647] dark:text-[#c0b9ad] font-bold mb-1">Strength (e.g. 650 mg)</label>
                                 <input
                                   type="text"
                                   value={editMedForm.strength || ''}
                                   onChange={(e) => setEditMedForm({ ...editMedForm, strength: e.target.value })}
-                                  className="w-full p-2 border rounded-lg text-xs font-semibold"
+                                  className="w-full p-2.5 bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-xl text-xs sm:text-sm font-semibold text-[#142b20] dark:text-[#f2f0e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                                 />
                               </div>
                               <div>
-                                <label className="block text-[10px] text-slate-500 font-bold mb-0.5">Dosage Form</label>
+                                <label className="block text-xs text-[#5c5647] dark:text-[#c0b9ad] font-bold mb-1">Dosage Form</label>
                                 <input
                                   type="text"
                                   value={editMedForm.dosageForm || 'Tablet'}
                                   onChange={(e) => setEditMedForm({ ...editMedForm, dosageForm: e.target.value })}
-                                  className="w-full p-2 border rounded-lg text-xs font-semibold"
+                                  className="w-full p-2.5 bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-xl text-xs sm:text-sm font-semibold text-[#142b20] dark:text-[#f2f0e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                                 />
                               </div>
                             </div>
@@ -953,13 +953,13 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
                             <div className="flex items-center justify-end gap-2 pt-2">
                               <button
                                 onClick={() => setEditingMedicineIdx(null)}
-                                className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-800 font-bold"
+                                className="min-h-[40px] px-3.5 py-1.5 text-xs text-[#5c5647] dark:text-[#c0b9ad] hover:text-[#142b20] font-bold cursor-pointer"
                               >
                                 Cancel
                               </button>
                               <button
                                 onClick={() => handleSaveConfirmedMedicine(idx)}
-                                className="px-4 py-1.5 bg-emerald-800 text-white font-bold text-xs rounded-lg shadow-xs flex items-center gap-1"
+                                className="min-h-[40px] px-4 py-2 bg-[#1a5336] hover:bg-[#143e29] text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                               >
                                 <Check className="w-3.5 h-3.5" />
                                 <span>Confirm & Save Medicine</span>
@@ -972,57 +972,57 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
                             <div className="flex items-center justify-between gap-2">
                               <div>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-bold text-sm text-slate-900 dark:text-slate-100">{m.name}</span>
+                                  <span className="font-bold text-sm sm:text-base text-[#142b20] dark:text-[#f2f0e8]">{m.name}</span>
                                   <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
                                       m.status === 'Prescribed medicine'
-                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
-                                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                                        ? 'bg-[#e8eee5] text-[#1a5336] dark:bg-[#23382b] dark:text-[#a3d4b6]'
+                                        : 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
                                     }`}
                                   >
                                     {m.status}
                                   </span>
                                 </div>
-                                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                                  Active Ingredient: <span className="font-bold text-slate-800 dark:text-slate-100">{m.activeIngredient || m.salt || m.name}</span> ({m.strength || m.dosage || 'Standard Strength'})
+                                <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] mt-0.5">
+                                  Active Ingredient: <span className="font-bold text-[#142b20] dark:text-[#f2f0e8]">{m.activeIngredient || m.salt || m.name}</span> ({m.strength || m.dosage || 'Standard Strength'})
                                 </p>
                               </div>
 
                               {m.isUnclear ? (
                                 <button
                                   onClick={() => handleStartEditMedicine(idx, m)}
-                                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs shrink-0 flex items-center gap-1"
+                                  className="min-h-[40px] px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                                 >
-                                  <Edit3 className="w-3 h-3" />
+                                  <Edit3 className="w-3.5 h-3.5" />
                                   <span>Review & Confirm</span>
                                 </button>
                               ) : (
-                                <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                  <CheckCircle2 className="w-3 h-3" /> High Confidence
+                                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-200 dark:border-emerald-800">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> High Confidence
                                 </span>
                               )}
                             </div>
 
                             {/* Unclear Warning Banner if handwriting blurry */}
                             {m.isUnclear && (
-                              <div className="mt-2 p-2.5 rounded-xl bg-amber-100/80 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between border border-amber-200 dark:border-amber-800">
-                                <span className="flex items-center gap-1.5 font-semibold text-[11px]">
-                                  <HelpCircle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <div className="mt-2.5 p-3 rounded-xl bg-amber-100/80 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between border border-amber-200 dark:border-amber-800">
+                                <span className="flex items-center gap-1.5 font-semibold text-xs">
+                                  <HelpCircle className="w-4 h-4 text-amber-700 shrink-0" />
                                   {m.unclearReason || 'Prescription handwriting unclear. Please confirm medicine details.'}
                                 </span>
                                 <button
                                   onClick={() => handleStartEditMedicine(idx, m)}
-                                  className="text-[11px] font-bold text-amber-800 underline hover:text-amber-950 shrink-0"
+                                  className="text-xs font-bold text-amber-800 underline hover:text-amber-950 shrink-0 cursor-pointer"
                                 >
                                   Confirm
                                 </button>
                               </div>
                             )}
 
-                            <div className="mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
-                              <p>Frequency: <span className="font-semibold text-slate-700 dark:text-slate-200">{m.frequency}</span> ({m.duration})</p>
+                            <div className="mt-2.5 pt-2.5 border-t border-[#e6dfd3] dark:border-[#283c2e] text-xs text-[#5c5647] dark:text-[#c0b9ad] space-y-0.5">
+                              <p>Frequency: <span className="font-semibold text-[#142b20] dark:text-[#f2f0e8]">{m.frequency}</span> ({m.duration})</p>
                               {m.instructions && (
-                                <p className="italic text-[11px] text-slate-500">Note: {m.instructions}</p>
+                                <p className="italic text-xs text-[#827b6c] dark:text-[#969082]">Note: {m.instructions}</p>
                               )}
                             </div>
                           </div>
@@ -1034,11 +1034,11 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
 
                 {/* Potential Risks */}
                 {scanResult.potentialRisks && scanResult.potentialRisks.length > 0 && (
-                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-200 space-y-1">
-                    <span className="font-bold flex items-center gap-1 text-amber-700 dark:text-amber-300">
-                      <AlertTriangle className="w-3.5 h-3.5" /> Safety Warnings
+                  <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+                    <span className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
+                      <AlertTriangle className="w-4 h-4" /> Safety Warnings
                     </span>
-                    <ul className="list-disc list-inside space-y-0.5 text-[11px]">
+                    <ul className="list-disc list-inside space-y-1 text-xs">
                       {scanResult.potentialRisks.map((r, i) => (
                         <li key={i}>{r}</li>
                       ))}
@@ -1047,24 +1047,24 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
                 )}
 
                 {/* Save and View Price Comparison Action Buttons */}
-                <div className="pt-2 space-y-2">
+                <div className="pt-2 space-y-2.5">
                   <button
                     onClick={() => setActiveTabMode('price_comparison')}
-                    className="w-full py-3 px-4 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                    className="w-full min-h-[44px] py-3 px-4 bg-[#1a5336] hover:bg-[#143e29] text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                   >
                     <IndianRupee className="w-4 h-4 text-amber-300" />
                     <span>Find Lowest Verified Prices & Nearby Pharmacies</span>
                   </button>
 
                   {isSaved ? (
-                    <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold flex items-center justify-between">
+                    <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs sm:text-sm font-semibold flex items-center justify-between">
                       <span className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                         Saved to Vault & Active Schedule!
                       </span>
                       <button
                         onClick={() => setActiveTab('vault')}
-                        className="text-xs font-bold underline hover:text-emerald-950"
+                        className="text-xs font-bold underline hover:text-emerald-950 cursor-pointer"
                       >
                         View Vault
                       </button>
@@ -1072,21 +1072,27 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
                   ) : (
                     <button
                       onClick={handleSaveToVaultAndActive}
-                      className="w-full py-2.5 px-4 bg-stone-100 dark:bg-slate-700 hover:bg-stone-200 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 border border-stone-200 dark:border-slate-600"
+                      className="w-full min-h-[44px] py-2.5 px-4 bg-[#fcfaf6] dark:bg-[#1d2e23] hover:bg-[#f6f2e9] dark:hover:bg-[#25382d] text-[#142b20] dark:text-[#f2f0e8] font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 border border-[#e6dfd3] dark:border-[#283c2e] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                     >
-                      <FolderPlus className="w-4 h-4 text-emerald-700" />
+                      <FolderPlus className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                       <span>Save Prescription Document to Medical Vault</span>
                     </button>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-400 space-y-2">
-                <ScanLine className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 stroke-1" />
-                <p className="text-xs font-medium">No prescription scanned yet.</p>
-                <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                  Select an image or document on the left and click "Run AI Scan" to extract medicines and check pharmacy availability.
-                </p>
+              <div className="text-center py-12 text-[#827b6c] dark:text-[#969082] space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center mx-auto border border-[#d2ded0] dark:border-[#2a4435]">
+                  <ScanLine className="w-7 h-7" />
+                </div>
+                <div className="space-y-1 max-w-xs mx-auto">
+                  <h4 className="text-sm sm:text-base font-bold text-[#142b20] dark:text-[#f2f0e8]">
+                    No prescription scanned yet
+                  </h4>
+                  <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] leading-relaxed">
+                    Upload a clear photo or use live camera to scan handwriting, extract medicines, and check nearby store prices.
+                  </p>
+                </div>
               </div>
             )}
           </div>

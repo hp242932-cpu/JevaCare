@@ -165,42 +165,42 @@ export const AIInsightsWidget: React.FC<AIInsightsWidgetProps> = React.memo(({
   };
 
   return (
-    <section className="bg-gradient-to-br from-emerald-900/10 via-white to-blue-900/10 dark:from-[#182a20] dark:via-[#14231b] dark:to-[#17282e] rounded-3xl border border-emerald-200/80 dark:border-emerald-800/60 p-6 sm:p-8 shadow-sm space-y-6">
+    <section className="bg-white dark:bg-[#16241c] rounded-3xl border border-[#e6dfd3] dark:border-[#283c2e] p-6 sm:p-8 shadow-xs space-y-6">
       
       {/* Widget Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-emerald-100 dark:border-emerald-900/40">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#e6dfd3] dark:border-[#283c2e]">
         <div className="flex items-start gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-600/20">
-            <Sparkles className="w-6 h-6 animate-pulse" />
+          <div className="w-11 h-11 rounded-2xl bg-[#e8eee5] dark:bg-[#1f3328] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center shrink-0 border border-[#d2ded0] dark:border-[#2a4435]">
+            <Sparkles className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-slate-800 dark:text-slate-100 text-xl tracking-tight">
-                AI Health Insights
+              <h3 className="font-bold text-[#142b20] dark:text-[#f2f0e8] text-lg sm:text-xl tracking-tight">
+                AI Health Insights & Clinical Trends
               </h3>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-mono font-bold border border-emerald-300 dark:border-emerald-800">
+              <span className="px-2.5 py-0.5 rounded-full bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] text-xs font-semibold border border-[#d2ded0] dark:border-[#2a4435]">
                 Gemini 3.6 Engine
               </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 text-[10px] font-mono font-bold border border-blue-300 dark:border-blue-800">
-                30-Day Trajectory
+              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-800">
+                30-Day Analysis
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-              Automated weekly textual health summary analyzing metric logs & active prescriptions
+            <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] font-normal mt-0.5">
+              Automated weekly clinical summary analyzing metric logs, active prescriptions, and vital trends.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
           {lastUpdated && (
-            <span className="text-[11px] text-slate-400 font-medium hidden md:inline-block">
+            <span className="text-xs text-[#827b6c] dark:text-[#969082] font-medium hidden md:inline-block">
               Updated {lastUpdated}
             </span>
           )}
           <button
             onClick={fetchInsights}
             disabled={loading}
-            className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 rounded-xl font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+            className="min-h-[44px] px-4 py-2 bg-[#fcfaf6] dark:bg-[#1d2e23] hover:bg-[#f6f2e9] dark:hover:bg-[#25382d] text-[#1a5336] dark:text-[#a3d4b6] border border-[#e6dfd3] dark:border-[#283c2e] rounded-xl font-bold text-xs shadow-2xs transition-all flex items-center gap-2 active:scale-[0.98] disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>{loading ? 'Analyzing...' : 'Refresh AI Analysis'}</span>
@@ -211,10 +211,10 @@ export const AIInsightsWidget: React.FC<AIInsightsWidgetProps> = React.memo(({
       {/* Shimmer Loading State */}
       {loading && (
         <div className="space-y-4 animate-pulse py-4">
-          <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl w-full"></div>
+          <div className="h-20 bg-[#f3efe6] dark:bg-[#1d2e23] rounded-2xl w-full"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="h-24 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-            <div className="h-24 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+            <div className="h-24 bg-[#f3efe6] dark:bg-[#1d2e23] rounded-2xl"></div>
+            <div className="h-24 bg-[#f3efe6] dark:bg-[#1d2e23] rounded-2xl"></div>
           </div>
         </div>
       )}
@@ -224,34 +224,34 @@ export const AIInsightsWidget: React.FC<AIInsightsWidgetProps> = React.memo(({
         <div className="space-y-6">
 
           {/* Weekly Textual Summary Card */}
-          <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl p-5 border border-emerald-100 dark:border-emerald-900/50 space-y-4">
+          <div className="bg-[#fcfaf6] dark:bg-[#192b20] rounded-2xl p-5 border border-[#e6dfd3] dark:border-[#283c2e] space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Brain className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                <Brain className="w-5 h-5 text-[#1a5336] dark:text-[#a3d4b6]" />
+                <h4 className="font-bold text-[#142b20] dark:text-[#f2f0e8] text-sm sm:text-base">
                   Weekly Health Narrative Summary
                 </h4>
               </div>
-              <span className="text-xs text-slate-400 font-medium italic font-serif-editorial">
+              <span className="text-xs text-[#827b6c] dark:text-[#969082] font-medium">
                 Past 7 Days Evaluation
               </span>
             </div>
 
-            <div className="text-slate-700 dark:text-slate-300 text-xs sm:text-sm leading-relaxed space-y-2 font-sans whitespace-pre-line">
+            <div className="text-[#383329] dark:text-[#d6d0c4] text-xs sm:text-sm leading-relaxed space-y-2 font-sans whitespace-pre-line">
               {insights.weeklySummary}
             </div>
 
             {/* Weekly Highlights */}
             {Array.isArray(insights.weeklyHighlights) && insights.weeklyHighlights.length > 0 && (
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                <p className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-2">
+              <div className="pt-3 border-t border-[#e6dfd3] dark:border-[#283c2e]">
+                <p className="text-xs uppercase tracking-wider font-bold text-[#827b6c] dark:text-[#969082] mb-2.5">
                   Key Weekly Milestones & Achievements
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                   {(insights.weeklyHighlights || []).map((hl, idx) => (
-                    <div key={idx} className="flex items-start gap-2 bg-emerald-50/60 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-100/60 dark:border-emerald-900/40">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                      <span className="text-xs text-slate-700 dark:text-slate-200 font-medium leading-snug">
+                    <div key={idx} className="flex items-start gap-2.5 bg-white dark:bg-[#1d2e23] p-3 rounded-xl border border-[#e6dfd3] dark:border-[#2a3f32]">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 mt-0.5" />
+                      <span className="text-xs sm:text-sm text-[#383329] dark:text-[#d6d0c4] font-medium leading-snug">
                         {hl}
                       </span>
                     </div>
@@ -265,12 +265,12 @@ export const AIInsightsWidget: React.FC<AIInsightsWidgetProps> = React.memo(({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                <TrendingUp className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                <h4 className="font-bold text-[#142b20] dark:text-[#f2f0e8] text-sm sm:text-base">
                   30-Day Vitals & Health Trends Indicator
                 </h4>
               </div>
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <span className="text-xs text-[#5c5647] dark:text-[#c0b9ad] font-medium">
                 Based on {metricLogs.length} metric logs
               </span>
             </div>
@@ -279,35 +279,35 @@ export const AIInsightsWidget: React.FC<AIInsightsWidgetProps> = React.memo(({
               {(insights.trends || []).map((trend, idx) => (
                 <div
                   key={idx}
-                  className="bg-white/90 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:border-emerald-300 dark:hover:border-emerald-700 transition-all space-y-3"
+                  className="bg-[#fcfaf6] dark:bg-[#192b20] rounded-2xl p-4 sm:p-5 border border-[#e6dfd3] dark:border-[#283c2e] shadow-2xs hover:border-[#1a5336] dark:hover:border-[#a3d4b6] transition-all space-y-3"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                      <p className="font-bold text-[#142b20] dark:text-[#f2f0e8] text-sm sm:text-base">
                         {trend.metric}
                       </p>
-                      <p className="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 mt-0.5">
                         {trend.percentageOrDiff}
                       </p>
                     </div>
                     {renderTrendBadge(trend.direction)}
                   </div>
 
-                  {/* Score bar */}
+                  {/* Stability Indicator */}
                   <div>
-                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 mb-1">
+                    <div className="flex justify-between items-center text-xs font-semibold text-[#5c5647] dark:text-[#c0b9ad] mb-1.5">
                       <span>Stability Score</span>
-                      <span className="text-slate-700 dark:text-slate-200">{trend.score}/100</span>
+                      <span className="font-bold text-[#142b20] dark:text-[#f2f0e8]">{trend.score}/100</span>
                     </div>
-                    <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-[#e6dfd3] dark:bg-[#283c2e] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-500"
+                        className="h-full bg-[#1a5336] dark:bg-[#a3d4b6] rounded-full transition-all duration-500"
                         style={{ width: `${Math.min(100, Math.max(10, trend.score))}%` }}
                       ></div>
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-normal">
+                  <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] leading-relaxed">
                     {trend.summary}
                   </p>
                 </div>
@@ -317,20 +317,22 @@ export const AIInsightsWidget: React.FC<AIInsightsWidgetProps> = React.memo(({
 
           {/* Next Week Actionable Recommendation */}
           {insights.recommendation && (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-start gap-3 shadow-md">
-              <Lightbulb className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h5 className="font-bold text-xs uppercase tracking-wider text-emerald-100">
-                  AI Recommended Action for Upcoming Week
-                </h5>
-                <p className="text-xs text-white/90 font-medium leading-relaxed mt-0.5">
-                  {insights.recommendation}
-                </p>
+            <div className="p-5 rounded-2xl bg-[#142b20] text-[#f2f0e8] border border-[#283c2e] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+              <div className="flex items-start gap-3 min-w-0">
+                <Lightbulb className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
+                <div>
+                  <h5 className="font-bold text-xs uppercase tracking-wider text-emerald-300">
+                    Clinical Action for Upcoming Week
+                  </h5>
+                  <p className="text-xs sm:text-sm text-[#f2f0e8]/90 font-medium leading-relaxed mt-0.5">
+                    {insights.recommendation}
+                  </p>
+                </div>
               </div>
               {onNavigateToTab && (
                 <button
                   onClick={() => onNavigateToTab('progress')}
-                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
                 >
                   View Full Vitals Tracker
                 </button>

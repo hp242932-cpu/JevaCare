@@ -27,6 +27,7 @@ import { supabaseVault } from '../../services/supabaseService';
 import { JevanCareLoader } from '../common/JevanCareLoader';
 import { DocumentSummaryModal } from './DocumentSummaryModal';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 
 interface MedicalVaultProps {
   vaultItems: VaultItem[];
@@ -41,6 +42,7 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
   onAddVaultItem,
   onDeleteVaultItem,
 }) => {
+  const { showToast, showConfirm } = useToast();
   const { user, profile: authProfile } = useAuth();
   const activeUserId = profile?.id || authProfile?.id || user?.id || 'demo_pat_001';
   const safeVaultItems = vaultItems || [];
@@ -302,30 +304,37 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
     }
   };
 
-  const handleDelete = async (item: VaultItem) => {
-    if (!confirm(`Are you sure you want to delete "${item.title}" from your Medical History?`)) {
-      return;
-    }
-
-    try {
-      await supabaseVault.deleteVaultItem(activeUserId, item.id);
-      if (onDeleteVaultItem) {
-        onDeleteVaultItem(item.id);
+  const handleDelete = (item: VaultItem) => {
+    showConfirm({
+      title: 'Delete Medical Record?',
+      message: `Are you sure you want to delete "${item.title}" from your Medical Vault? This action cannot be undone.`,
+      confirmText: 'Delete Record',
+      cancelText: 'Keep Record',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await supabaseVault.deleteVaultItem(activeUserId, item.id);
+          if (onDeleteVaultItem) {
+            onDeleteVaultItem(item.id);
+          }
+          showToast(`Deleted "${item.title}" from Medical Vault.`, 'success');
+          auditLogger.logAction(
+            'RECORD_DELETE',
+            `Deleted record "${item.title}" from Medical Vault.`,
+            undefined,
+            'SUCCESS'
+          );
+        } catch (err) {
+          console.error('Failed to delete item:', err);
+          showToast('Failed to delete record. Please try again.', 'error');
+        }
       }
-      auditLogger.logAction(
-        'RECORD_DELETE',
-        `Deleted record "${item.title}" from Medical Vault.`,
-        undefined,
-        'SUCCESS'
-      );
-    } catch (err) {
-      console.error('Failed to delete item:', err);
-    }
+    });
   };
 
   const handleDownloadSummaryPdf = async () => {
     if (safeVaultItems.length === 0) {
-      alert('Your Medical Vault is currently empty. Please upload medical records before downloading a summary.');
+      showToast('Your Medical Vault is currently empty. Please upload medical records before downloading a summary.', 'warning');
       return;
     }
 
@@ -511,7 +520,7 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
       );
     } catch (err) {
       console.error('Failed to generate Medical Vault PDF Summary:', err);
-      alert('Unable to generate PDF summary. Please try again.');
+      showToast('Unable to generate PDF summary. Please try again.', 'error');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -521,40 +530,44 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
     <div className="space-y-6">
 
       {/* Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-950 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+      <div className="bg-white dark:bg-[#16241c] rounded-3xl p-6 sm:p-8 border border-[#e6dfd3] dark:border-[#283c2e] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center shrink-0 border border-[#d2ded0] dark:border-[#2a4435]">
             <FolderLock className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800 dark:text-white">Medical Vault & Centralized Records</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Secure Supabase storage for your lifelong medical history, reports, prescriptions & emergency QR access.
+            <h2 className="text-xl sm:text-2xl font-bold text-[#142b20] dark:text-[#f2f0e8] font-serif-editorial">
+              Medical Vault & Records
+            </h2>
+            <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] mt-0.5">
+              Secure encrypted storage for your lifelong medical history, prescriptions, lab reports, and emergency QR access.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
           <button
             onClick={handleDownloadSummaryPdf}
             disabled={isGeneratingPdf || safeVaultItems.length === 0}
-            className="px-3.5 py-2 bg-[#1b3b2b] hover:bg-[#244836] disabled:opacity-50 text-[#fcfaf6] text-xs font-semibold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer border border-[#1b3b2b]"
+            className="min-h-[44px] px-4 py-2 bg-[#fcfaf6] dark:bg-[#1d2e23] hover:bg-[#f6f2e9] dark:hover:bg-[#25382d] disabled:opacity-50 text-[#1a5336] dark:text-[#a3d4b6] text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition-all flex items-center gap-2 cursor-pointer border border-[#e6dfd3] dark:border-[#283c2e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
             title={safeVaultItems.length === 0 ? 'Your Medical Vault is currently empty' : 'Download Medical Vault Summary PDF'}
+            aria-label="Export Medical PDF Summary"
           >
             {isGeneratingPdf ? (
               <JevanCareLoader size="xs" color="white" label="Preparing..." />
             ) : (
               <>
-                <FileDown className="w-4 h-4 text-[#a3d4b6]" />
-                <span>Download Summary</span>
+                <FileDown className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Export PDF Summary</span>
               </>
             )}
           </button>
           <button
             onClick={() => setShowQrModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-800 dark:text-slate-100 text-xs font-bold flex items-center gap-1.5 transition-colors"
+            className="min-h-[44px] px-4 py-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition-all flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            aria-label="Emergency QR Access"
           >
-            <QrCode className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+            <QrCode className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
             <span>Emergency QR</span>
           </button>
           <button
@@ -562,9 +575,10 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
               setUploadError(null);
               setShowUploadModal(true);
             }}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-md shadow-teal-500/20 transition-all flex items-center gap-1.5"
+            className="min-h-[44px] px-4 py-2 bg-[#1a5336] hover:bg-[#143e29] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
+            aria-label="Upload Document"
           >
-            <Upload className="w-4 h-4" />
+            <Upload className="w-4 h-4 text-emerald-300" />
             <span>Upload Document</span>
           </button>
         </div>
@@ -573,7 +587,7 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
       {/* Natural Language AI Search Bar */}
       <form onSubmit={handleAiVaultSearch} className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#827b6c] dark:text-[#969082]" />
           <input
             type="text"
             value={searchQuery}
@@ -582,35 +596,35 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
               if (!e.target.value) setAiSearchResults(null);
             }}
             placeholder="Search medical records in natural language (e.g., 'Show prescriptions from Dr. Tripathi')..."
-            className="w-full pl-10 pr-4 py-3 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-teal-500 text-slate-800 dark:text-slate-100 shadow-xs"
+            className="w-full pl-10 pr-4 py-3 text-xs sm:text-sm bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] text-[#142b20] dark:text-[#f2f0e8] placeholder-[#827b6c] dark:placeholder-[#969082] shadow-xs"
           />
         </div>
         <button
           type="submit"
           disabled={isAiSearching}
-          className="px-4 py-2.5 bg-gradient-to-r from-teal-600 to-blue-600 hover:from-teal-700 hover:to-blue-700 text-white font-bold text-xs rounded-2xl shadow-xs transition-all flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+          className="min-h-[44px] px-4 py-2 bg-[#1a5336] hover:bg-[#143e29] text-white font-bold text-xs sm:text-sm rounded-2xl shadow-xs transition-all flex items-center gap-2 shrink-0 disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
         >
           {isAiSearching ? (
             <JevanCareLoader size="xs" color="white" label="Searching..." />
           ) : (
             <>
               <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>AI Search Vault</span>
+              <span>AI Search</span>
             </>
           )}
         </button>
       </form>
 
       {/* Category Pills */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-none">
+      <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
         {categories.map((cat) => (
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`min-h-[40px] px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
               selectedCategory === cat
-                ? 'bg-teal-600 text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                ? 'bg-[#1a5336] text-white shadow-xs'
+                : 'bg-white dark:bg-[#16241c] text-[#5c5647] dark:text-[#c0b9ad] border border-[#e6dfd3] dark:border-[#283c2e] hover:bg-[#fcfaf6] dark:hover:bg-[#1d2e23]'
             }`}
           >
             {cat}
@@ -620,80 +634,97 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
 
       {/* Documents Grid */}
       {filteredItems.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-12 text-center space-y-3">
-          <FolderLock className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto stroke-1" />
-          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">No medical records found</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            {searchQuery
-              ? `No documents matching "${searchQuery}". Try a different search query or clear filters.`
-              : 'Your medical vault is empty. Click "Upload Document" to securely store your prescriptions, lab reports, and medical files.'}
-          </p>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-md transition-all inline-flex items-center gap-2"
-          >
-            <Upload className="w-4 h-4" />
-            <span>Upload First Document</span>
-          </button>
+        <div className="bg-white dark:bg-[#16241c] rounded-3xl border border-[#e6dfd3] dark:border-[#283c2e] p-8 sm:p-12 text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center mx-auto border border-[#d2ded0] dark:border-[#2a4435]">
+            <FolderLock className="w-7 h-7" />
+          </div>
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="text-base sm:text-lg font-bold text-[#142b20] dark:text-[#f2f0e8]">
+              {searchQuery ? 'No matching medical documents found' : 'Your medical vault is empty'}
+            </h3>
+            <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] leading-relaxed">
+              {searchQuery
+                ? `No documents matched "${searchQuery}". Clear your search query or select another category to view all records.`
+                : 'Store and organize all your prescriptions, lab test reports, hospital discharge summaries, and vaccine records in one private, encrypted place.'}
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                if (searchQuery) {
+                  setSearchQuery('');
+                  setSelectedCategory('All');
+                } else {
+                  setUploadError(null);
+                  setShowUploadModal(true);
+                }
+              }}
+              className="min-h-[44px] px-5 py-2.5 bg-[#1a5336] hover:bg-[#143e29] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all inline-flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
+            >
+              <Upload className="w-4 h-4 text-emerald-300" />
+              <span>{searchQuery ? 'Clear Search Filters' : 'Upload First Medical Document'}</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
           {filteredItems.map((item) => (
             <div
               key={item.id}
-              className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 shadow-xs hover:border-teal-300 dark:hover:border-teal-700 transition-all flex flex-col justify-between space-y-4 min-w-0"
+              className="bg-white dark:bg-[#16241c] rounded-2xl border border-[#e6dfd3] dark:border-[#283c2e] p-5 shadow-xs hover:border-[#1a5336] dark:hover:border-[#a3d4b6] transition-all flex flex-col justify-between space-y-4 min-w-0"
             >
-              <div className="space-y-2 min-w-0">
+              <div className="space-y-2.5 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 shrink-0">
+                  <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#e8eee5] text-[#1a5336] dark:bg-[#23382b] dark:text-[#a3d4b6] shrink-0 border border-[#d2ded0] dark:border-[#2a4435]">
                     {item.category}
                   </span>
-                  <span className="text-[10px] font-medium text-slate-400 shrink-0">{item.fileSize || '1.2 MB'}</span>
+                  <span className="text-xs font-medium text-[#827b6c] dark:text-[#969082] shrink-0">{item.fileSize || '1.2 MB'}</span>
                 </div>
 
-                <h3 className="font-bold text-sm text-slate-800 dark:text-white leading-snug break-words">
+                <h3 className="font-bold text-sm sm:text-base text-[#142b20] dark:text-[#f2f0e8] leading-snug break-words">
                   {item.title}
                 </h3>
 
                 {item.doctorName && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 min-w-0">
-                    <User className="w-3.5 h-3.5 text-teal-500 shrink-0" />
-                    <span className="truncate">Doctor: {item.doctorName}</span>
+                  <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] flex items-center gap-1.5 min-w-0">
+                    <User className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
+                    <span className="truncate">Doctor: <strong>{item.doctorName}</strong></span>
                   </p>
                 )}
 
-                <p className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold flex items-center gap-1 min-w-0">
-                  <Tag className="w-3 h-3 shrink-0" />
+                <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5 min-w-0">
+                  <Tag className="w-3.5 h-3.5 shrink-0" />
                   <span className="truncate">Tag: {item.diseaseOrTag}</span>
                 </p>
 
                 {item.notes && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 italic bg-slate-50 dark:bg-slate-900/60 p-2 rounded-lg line-clamp-3">
+                  <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#283c2e] p-2.5 rounded-xl line-clamp-3 leading-relaxed">
                     "{item.notes}"
                   </p>
                 )}
               </div>
 
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs">
-                <span className="text-slate-400 text-[11px] flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> {item.date}
+              <div className="pt-3 border-t border-[#e6dfd3] dark:border-[#283c2e] flex items-center justify-between text-xs">
+                <span className="text-[#827b6c] dark:text-[#969082] text-xs flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" /> {item.date}
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   {/* AI Summary Button */}
                   <button
                     onClick={() => setSummaryItem(item)}
-                    className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-bold text-[10px] flex items-center gap-1 border border-emerald-200/60 dark:border-emerald-800/60 transition-all cursor-pointer"
+                    className="min-h-[36px] px-2.5 py-1 rounded-lg bg-[#e8eee5] dark:bg-[#23382b] hover:bg-[#d8e4d4] text-[#1a5336] dark:text-[#a3d4b6] font-bold text-xs flex items-center gap-1 border border-[#d2ded0] dark:border-[#2a4435] transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                     title="Generate AI Document Summary"
                   >
-                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
                     <span>AI Summary</span>
                   </button>
 
                   {/* View Preview Button */}
                   <button
                     onClick={() => setPreviewItem(item)}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    className="min-h-[36px] min-w-[36px] p-2 rounded-lg hover:bg-[#f6f2e9] dark:hover:bg-[#1d2e23] text-[#5c5647] dark:text-[#c0b9ad] flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                     title="View / Preview Document"
+                    aria-label="Preview Document"
                   >
                     <Eye className="w-4 h-4" />
                   </button>
@@ -701,8 +732,9 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
                   {/* Download Button */}
                   <button
                     onClick={() => handleDownload(item)}
-                    className="p-1.5 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950 text-teal-600 dark:text-teal-400"
+                    className="min-h-[36px] min-w-[36px] p-2 rounded-lg hover:bg-[#e8eee5] dark:hover:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                     title="Download Document"
+                    aria-label="Download Document"
                   >
                     <Download className="w-4 h-4" />
                   </button>
@@ -710,8 +742,9 @@ export const MedicalVault: React.FC<MedicalVaultProps> = ({
                   {/* Delete Button */}
                   <button
                     onClick={() => handleDelete(item)}
-                    className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950 text-rose-500 hover:text-rose-700"
+                    className="min-h-[36px] min-w-[36px] p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/60 text-rose-600 hover:text-rose-700 flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                     title="Delete Record"
+                    aria-label="Delete Document"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

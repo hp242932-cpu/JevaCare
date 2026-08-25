@@ -41,6 +41,7 @@ import {
   VoicePersonality,
   AppLanguage,
 } from '../../services/voiceAssistantService';
+import { useToast } from '../../context/ToastContext';
 
 interface AIHealthAssistantProps {
   userProfile?: UserProfile;
@@ -103,6 +104,7 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
   activeMedicines = [],
   onOpenEmergency = () => {},
 }) => {
+  const { showToast, showConfirm } = useToast();
   const currentProfile = userProfile || profile || {
     id: 'u1',
     name: 'Aarav Sharma',
@@ -226,20 +228,28 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, isLoading]);
 
-  const handleClearHistory = async () => {
-    if (window.confirm('Are you sure you want to clear your conversation with the Health Companion?')) {
-      if (currentProfile.id) {
-        await supabaseAssistantMessages.clearMessages(currentProfile.id);
+  const handleClearHistory = () => {
+    showConfirm({
+      title: 'Clear Conversation History?',
+      message: 'Are you sure you want to clear your conversation with the Health Companion? Previous messages will be removed.',
+      confirmText: 'Clear Chat',
+      cancelText: 'Keep Chat',
+      isDestructive: true,
+      onConfirm: async () => {
+        if (currentProfile.id) {
+          await supabaseAssistantMessages.clearMessages(currentProfile.id);
+        }
+        voiceAssistant.stop();
+        setMessages([
+          {
+            ...welcomeMessage,
+            text: getWelcomeText(selectedLanguage, currentProfile.name || 'Friend'),
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
+        showToast('Chat history cleared.', 'info');
       }
-      voiceAssistant.stop();
-      setMessages([
-        {
-          ...welcomeMessage,
-          text: getWelcomeText(selectedLanguage, currentProfile.name || 'Friend'),
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-    }
+    });
   };
 
   const handleCopyMessage = (text: string, id: string) => {
@@ -605,29 +615,29 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
       {showSettings && (
         <div
           id="assistant-settings-tray"
-          className="p-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3 animate-fadeIn"
+          className="p-5 bg-white dark:bg-[#16241c] rounded-2xl border border-[#e6dfd3] dark:border-[#283c2e] shadow-xs space-y-4 animate-fadeIn"
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             {/* 1. Language Preference Tabs */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-emerald-600" />
-                Response Language Preference
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#142b20] dark:text-[#f2f0e8] flex items-center gap-1.5 uppercase tracking-wider">
+                <Globe className="w-4 h-4 text-[#1a5336] dark:text-[#a3d4b6]" />
+                Response Language
               </label>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 {[
                   { id: 'auto', label: '🌐 Auto-Detect' },
-                  { id: 'en', label: '🇬🇧 English' },
-                  { id: 'hinglish', label: '🇮🇳 Hinglish (Roman Hindi)' },
-                  { id: 'hi', label: '🇮🇳 हिंदी (Hindi)' },
+                  { id: 'en', label: 'English' },
+                  { id: 'hinglish', label: 'Hinglish (Roman Hindi)' },
+                  { id: 'hi', label: 'हिंदी (Hindi)' },
                 ].map((item) => (
                   <button
                     key={item.id}
                     onClick={() => handleSelectLanguage(item.id as AppLanguage)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                    className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
                       selectedLanguage === item.id
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                        : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                        ? 'bg-[#1a5336] text-white border-[#1a5336] shadow-2xs'
+                        : 'bg-[#fcfaf6] dark:bg-[#1d2e23] text-[#5c5647] dark:text-[#c0b9ad] border-[#e6dfd3] dark:border-[#283c2e] hover:bg-[#f6f2e9]'
                     }`}
                   >
                     {item.label}
@@ -637,24 +647,24 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
             </div>
 
             {/* 2. Voice Personality Selector */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <HeartHandshake className="w-3.5 h-3.5 text-teal-600" />
-                Voice Companion Tone
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#142b20] dark:text-[#f2f0e8] flex items-center gap-1.5 uppercase tracking-wider">
+                <HeartHandshake className="w-4 h-4 text-[#1a5336] dark:text-[#a3d4b6]" />
+                Voice Companion Cadence
               </label>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 {[
-                  { id: 'calm', label: '🌸 Calm (Gentle)', desc: 'Soothing, empathetic cadence' },
-                  { id: 'clear', label: '🎙️ Clear (Crisp)', desc: 'Neutral, professional pacing' },
-                  { id: 'friendly', label: '✨ Friendly (Warm)', desc: 'Natural, conversational rhythm' },
+                  { id: 'calm', label: 'Calm & Gentle', desc: 'Soothing, empathetic clinical tone' },
+                  { id: 'clear', label: 'Clear & Concise', desc: 'Direct, neutral clinical pacing' },
+                  { id: 'friendly', label: 'Warm & Helpful', desc: 'Supportive, conversational tone' },
                 ].map((tone) => (
                   <button
                     key={tone.id}
                     onClick={() => handleSelectPersonality(tone.id as VoicePersonality)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                    className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
                       voicePersonality === tone.id
-                        ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
-                        : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                        ? 'bg-[#1a5336] text-white border-[#1a5336] shadow-2xs'
+                        : 'bg-[#fcfaf6] dark:bg-[#1d2e23] text-[#5c5647] dark:text-[#c0b9ad] border-[#e6dfd3] dark:border-[#283c2e] hover:bg-[#f6f2e9]'
                     }`}
                     title={tone.desc}
                   >
@@ -671,25 +681,25 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
       {isSpeaking && (
         <div
           id="assistant-speaking-banner"
-          className="p-3 bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 text-white rounded-2xl border border-teal-700/50 shadow-md flex items-center justify-between gap-3 animate-fadeIn"
+          className="p-4 bg-[#142b20] text-[#f2f0e8] rounded-2xl border border-[#283c2e] shadow-md flex items-center justify-between gap-3 animate-fadeIn"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-teal-500/20 border border-teal-400/40 flex items-center justify-center text-teal-300 shrink-0">
-              <Volume2 className="w-4 h-4 animate-bounce" />
+            <div className="w-9 h-9 rounded-xl bg-emerald-950/80 border border-emerald-700/60 flex items-center justify-center text-emerald-300 shrink-0">
+              <Volume2 className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-xs text-white">JeevanCare Companion Speaking</span>
+                <span className="font-bold text-xs sm:text-sm text-white">JeevanCare Voice Companion Speaking</span>
                 {/* Audio Waveform visualization */}
-                <div className="flex items-center gap-0.5 h-3">
-                  <span className="w-1 bg-teal-400 rounded-full h-full animate-pulse" />
-                  <span className="w-1 bg-teal-300 rounded-full h-2 animate-pulse delay-75" />
-                  <span className="w-1 bg-teal-500 rounded-full h-3 animate-pulse delay-150" />
-                  <span className="w-1 bg-teal-400 rounded-full h-1.5 animate-pulse delay-200" />
+                <div className="flex items-center gap-1 h-3">
+                  <span className="w-1 bg-emerald-400 rounded-full h-full animate-pulse" />
+                  <span className="w-1 bg-emerald-300 rounded-full h-2 animate-pulse delay-75" />
+                  <span className="w-1 bg-emerald-500 rounded-full h-3 animate-pulse delay-150" />
+                  <span className="w-1 bg-emerald-400 rounded-full h-1.5 animate-pulse delay-200" />
                 </div>
               </div>
-              <p className="text-[11px] text-teal-200 opacity-90">
-                Playing spoken response with natural cadence. You can interrupt anytime by speaking or clicking stop.
+              <p className="text-xs text-emerald-200 mt-0.5">
+                Playing spoken guidance. Click Stop Speech anytime to pause playback.
               </p>
             </div>
           </div>
@@ -697,10 +707,10 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
           <button
             id="btn-stop-speaking-banner"
             onClick={stopSpeaking}
-            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+            className="min-h-[44px] px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center gap-2 transition-all shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
           >
             <Square className="w-3.5 h-3.5 fill-current" />
-            <span>Stop Speech 🔇</span>
+            <span>Stop Speech</span>
           </button>
         </div>
       )}
@@ -709,16 +719,16 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
       {isListening && (
         <div
           id="assistant-listening-banner"
-          className="p-3 bg-gradient-to-r from-rose-950 via-rose-900 to-slate-900 text-white rounded-2xl border border-rose-700/60 shadow-md flex items-center justify-between gap-3 animate-fadeIn"
+          className="p-4 bg-rose-950 text-white rounded-2xl border border-rose-800 shadow-md flex items-center justify-between gap-3 animate-fadeIn"
         >
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-xl bg-rose-500/30 border border-rose-400/50 flex items-center justify-center text-rose-300 animate-pulse shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-rose-900 border border-rose-700 flex items-center justify-center text-rose-300 animate-pulse shrink-0">
               <Mic className="w-4 h-4 text-rose-200" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-xs text-rose-200">Listening to your speech...</span>
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                <span className="font-bold text-xs sm:text-sm text-rose-100">Listening to your speech...</span>
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
               </div>
               <p className="text-xs font-medium text-white truncate italic mt-0.5">
                 "{transcriptPreview || 'Speak your symptoms or health query clearly...'}"
@@ -729,10 +739,10 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
           <button
             id="btn-stop-mic-banner"
             onClick={stopVoiceRecording}
-            className="px-3 py-1.5 bg-white text-rose-900 hover:bg-rose-100 font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+            className="min-h-[44px] px-4 py-2 bg-white text-rose-900 hover:bg-rose-100 font-bold text-xs sm:text-sm rounded-xl shadow-xs flex items-center gap-2 transition-all shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             <Square className="w-3.5 h-3.5 fill-current" />
-            <span>Stop Mic ⏹️</span>
+            <span>Stop Mic</span>
           </button>
         </div>
       )}
@@ -983,7 +993,7 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
           <button
             type="button"
             onClick={() => document.getElementById('assistant-image-input')?.click()}
-            className="p-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors shrink-0 cursor-pointer"
+            className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors shrink-0 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
             title="Attach Prescription or Symptom Photo"
           >
             <ImageIcon className="w-4 h-4" />
@@ -993,7 +1003,7 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
           <button
             type="button"
             onClick={toggleVoiceRecording}
-            className={`p-2.5 rounded-xl border transition-all shrink-0 flex items-center gap-1.5 font-bold text-xs cursor-pointer ${
+            className={`min-h-[44px] px-3.5 py-2.5 rounded-xl border transition-all shrink-0 flex items-center gap-1.5 font-bold text-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
               isListening
                 ? 'bg-rose-600 text-white border-rose-700 shadow-md animate-pulse'
                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -1003,12 +1013,12 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
             {isListening ? (
               <>
                 <MicOff className="w-4 h-4 text-white" />
-                <span className="hidden md:inline">Listening...</span>
+                <span className="hidden sm:inline">Listening...</span>
               </>
             ) : (
               <>
                 <Mic className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="hidden md:inline">Voice Input</span>
+                <span className="hidden sm:inline">Voice Input</span>
               </>
             )}
           </button>
@@ -1032,7 +1042,7 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
                 ? 'Symptoms, medicine ya health guidance ke baare me puchiye...'
                 : 'Ask symptoms, medicine questions, or lifestyle guidance...'
             }
-            className="flex-1 px-4 py-2.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-100"
+            className="flex-1 min-h-[44px] px-4 py-2.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] text-slate-800 dark:text-slate-100"
           />
 
           {/* Stop Speaking Form Control if Active */}
@@ -1040,7 +1050,7 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
             <button
               type="button"
               onClick={stopSpeaking}
-              className="p-2.5 bg-rose-600 text-white font-bold rounded-xl shadow-md transition-all shrink-0 cursor-pointer"
+              className="min-h-[44px] min-w-[44px] p-2.5 bg-rose-600 text-white font-bold rounded-xl shadow-md transition-all shrink-0 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
               title="Stop Voice Output"
             >
               <Square className="w-4 h-4 fill-current" />
@@ -1052,7 +1062,7 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
             id="btn-assistant-send-message"
             type="submit"
             disabled={isLoading || (!input.trim() && !selectedImage)}
-            className="p-2.5 bg-[#1b3b2b] hover:bg-[#244836] text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-40 shrink-0 cursor-pointer"
+            className="min-h-[44px] min-w-[44px] px-4 py-2.5 bg-[#1a5336] hover:bg-[#143e29] text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-40 shrink-0 cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
             title="Send Message"
           >
             {isLoading ? <JevanCareLoader size="xs" color="white" /> : <Send className="w-4 h-4" />}

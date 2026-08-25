@@ -714,6 +714,52 @@ export const supabaseMedicines = {
       return false;
     }
   },
+
+  async updateMedicineDose(userId: string, medId: string, remainingDoses: number): Promise<boolean> {
+    const cacheKey = getUserCacheKey('medicines', userId);
+    const existing = await this.fetchActiveMedicines(userId);
+    const updated = existing.map((m) => (m.id === medId ? { ...m, remainingDoses } : m));
+    localStorage.setItem(cacheKey, JSON.stringify(updated));
+
+    if (!isSupabaseConfigured) return true;
+
+    try {
+      const { error } = await supabase
+        .from('active_medicines')
+        .update({ remaining_doses: remainingDoses })
+        .eq('id', medId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Failed to update medicine dose in Supabase:', err);
+      return false;
+    }
+  },
+
+  async deleteMedicine(userId: string, medId: string): Promise<boolean> {
+    const cacheKey = getUserCacheKey('medicines', userId);
+    const existing = await this.fetchActiveMedicines(userId);
+    const filtered = existing.filter((m) => m.id !== medId);
+    localStorage.setItem(cacheKey, JSON.stringify(filtered));
+
+    if (!isSupabaseConfigured) return true;
+
+    try {
+      const { error } = await supabase
+        .from('active_medicines')
+        .delete()
+        .eq('id', medId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn('Failed to delete medicine from Supabase:', err);
+      return false;
+    }
+  },
 };
 
 // ============================================================================

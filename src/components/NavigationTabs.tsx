@@ -173,7 +173,7 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = React.memo(({
 
       {/* MOBILE TOP SUB-TABS (When in Care, Records, or AI) */}
       {activeCategory.subTabs && (
-        <div className="md:hidden bg-[#f6f2e9] dark:bg-[#16241c] border-b border-[#e6dfd3] dark:border-[#233529] px-3 py-1.5 sticky top-16 z-30 overflow-x-auto no-scrollbar flex items-center gap-1.5">
+        <div className="md:hidden bg-[#f6f2e9] dark:bg-[#16241c] border-b border-[#e6dfd3] dark:border-[#233529] px-3 py-2 sticky top-16 z-30 overflow-x-auto no-scrollbar flex items-center gap-2">
           {activeCategory.subTabs.map((sub) => {
             const SubIcon = sub.icon;
             const isSubActive = activeTab === sub.id;
@@ -181,13 +181,13 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = React.memo(({
               <button
                 key={sub.id}
                 onClick={() => setActiveTab(sub.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap shrink-0 transition-all ${
+                className={`min-h-[44px] flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
                   isSubActive
-                    ? 'bg-[#1b3b2b] text-white shadow-2xs'
-                    : 'text-[#5c5647] dark:text-slate-300 bg-white/60 dark:bg-[#1a2b21]'
+                    ? 'bg-[#1a5336] text-white shadow-xs'
+                    : 'text-[#5c5647] dark:text-[#f2efe9] bg-white/80 dark:bg-[#1a2b21] border border-[#e6dfd3] dark:border-[#2a3f32]'
                 }`}
               >
-                <SubIcon className="w-3 h-3" />
+                <SubIcon className="w-3.5 h-3.5" />
                 <span>{sub.label}</span>
               </button>
             );
@@ -198,8 +198,8 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = React.memo(({
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       <nav
         aria-label="Mobile Bottom Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#fcfaf6]/95 dark:bg-[#121e17]/95 backdrop-blur-md border-t border-[#e6dfd3] dark:border-[#233529] px-2 py-1.5 flex justify-around items-center"
-        style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#fcfaf6]/95 dark:bg-[#121e17]/95 backdrop-blur-md border-t border-[#e6dfd3] dark:border-[#233529] px-2 py-1 flex justify-around items-center"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
         {categories.map((cat) => {
           const Icon = cat.icon;
@@ -212,16 +212,16 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = React.memo(({
                 if (cat.matchingTabs.includes(activeTab)) return;
                 setActiveTab(cat.defaultTab);
               }}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
+              className={`min-h-[44px] min-w-[48px] flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
                 isCatActive
-                  ? 'text-[#1b3b2b] dark:text-[#a3d4b6] font-bold'
-                  : 'text-[#827b6c] dark:text-[#8d8778]'
+                  ? 'text-[#1a5336] dark:text-[#a3d4b6] font-bold'
+                  : 'text-[#6e6859] dark:text-[#c4beb2] hover:text-[#1a5336] dark:hover:text-white'
               }`}
             >
-              <div className={`p-1 rounded-lg transition-all ${isCatActive ? 'bg-[#e8eee5] dark:bg-[#1d3126]' : ''}`}>
-                <Icon className={`w-5 h-5 ${isCatActive ? 'text-[#1b3b2b] dark:text-[#a3d4b6]' : 'text-[#827b6c]'}`} />
+              <div className={`p-1.5 rounded-lg transition-all ${isCatActive ? 'bg-[#e8eee5] dark:bg-[#1d3126]' : ''}`}>
+                <Icon className={`w-5 h-5 ${isCatActive ? 'text-[#1a5336] dark:text-[#a3d4b6]' : 'text-current'}`} />
               </div>
-              <span className="text-[10px] mt-0.5 tracking-tight">{cat.label}</span>
+              <span className="text-[10px] mt-0.5 tracking-tight font-medium">{cat.label}</span>
             </button>
           );
         })}

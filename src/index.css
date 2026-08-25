@@ -38,35 +38,47 @@
 }
 
 :root {
-  --bg-app: #fcfaf6;
-  --bg-surface: #ffffff;
-  --bg-surface-subtle: #f6f2e9;
-  --bg-sage: #e8eee5;
-  --bg-blush: #f8ebea;
-  --text-primary: #1b3b2b;
-  --text-secondary: #5c5647;
-  --text-muted: #827b6c;
-  --border-warm: #e6dfd3;
-  --border-sage: #d3decf;
-  --color-primary: #1b3b2b;
-  --color-primary-hover: #244836;
-  --color-accent: #8b263e;
+  --bg-canvas: #FAF8F5;
+  --bg-surface: #FFFFFF;
+  --bg-surface-raised: #F3EFE6;
+  --border-subtle: #E8E2D7;
+  --text-primary: #142B20;
+  --text-secondary: #4A554D;
+  --text-muted: #6E7A71;
+  --color-accent: #1A5336;
+  --color-emergency: #A61C1C;
+
+  /* Backward compatible aliases mapped to semantic tokens */
+  --bg-app: var(--bg-canvas);
+  --bg-surface-subtle: var(--bg-surface-raised);
+  --bg-sage: var(--bg-surface-raised);
+  --bg-blush: #faeceb;
+  --border-warm: var(--border-subtle);
+  --border-sage: var(--border-subtle);
+  --color-primary: var(--color-accent);
+  --color-primary-hover: #143e29;
 }
 
 .dark {
-  --bg-app: #0f1a14;
-  --bg-surface: #16241c;
-  --bg-surface-subtle: #1d2e23;
-  --bg-sage: #23382b;
-  --bg-blush: #2e1d21;
-  --text-primary: #f2f0e8;
-  --text-secondary: #c0b9ad;
-  --text-muted: #969082;
-  --border-warm: #283c2e;
-  --border-sage: #2f4637;
-  --color-primary: #a3d4b6;
-  --color-primary-hover: #bde6cb;
-  --color-accent: #e27d8e;
+  --bg-canvas: #0E1712;
+  --bg-surface: #15221B;
+  --bg-surface-raised: #1D2D24;
+  --border-subtle: #25382D;
+  --text-primary: #F2EFE9;
+  --text-secondary: #BAC7BE;
+  --text-muted: #91A396;
+  --color-accent: #34D399;
+  --color-emergency: #F87171;
+
+  /* Backward compatible aliases mapped to semantic tokens */
+  --bg-app: var(--bg-canvas);
+  --bg-surface-subtle: var(--bg-surface-raised);
+  --bg-sage: var(--bg-surface-raised);
+  --bg-blush: #2d161a;
+  --border-warm: var(--border-subtle);
+  --border-sage: var(--border-subtle);
+  --color-primary: var(--color-accent);
+  --color-primary-hover: #2bc48b;
 }
 
 @layer base {
@@ -233,11 +245,21 @@
 
 /* Focus rings for keyboard accessibility */
 :focus-visible {
-  outline: 2px solid #1b3b2b;
+  outline: 2px solid #1a5336;
   outline-offset: 2px;
 }
 .dark :focus-visible {
-  outline: 2px solid #a3d4b6;
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+
+/* Touch target helper class for mobile accessibility */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* =========================================================================

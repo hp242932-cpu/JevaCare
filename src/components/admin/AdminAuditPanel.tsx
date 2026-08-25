@@ -19,12 +19,14 @@ import {
 } from 'lucide-react';
 import { auditLogger, AuditLog } from '../../services/AuditLogger';
 import { UserProfile } from '../../types';
+import { useToast } from '../../context/ToastContext';
 
 interface AdminAuditPanelProps {
   userProfile?: UserProfile;
 }
 
 export const AdminAuditPanel: React.FC<AdminAuditPanelProps> = ({ userProfile }) => {
+  const { showToast, showConfirm } = useToast();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
@@ -39,10 +41,18 @@ export const AdminAuditPanel: React.FC<AdminAuditPanelProps> = ({ userProfile })
   }, []);
 
   const handleClearLogs = () => {
-    if (window.confirm('Are you sure you want to clear all system audit logs? This action is recorded in immutable security backup.')) {
-      auditLogger.clearLogs();
-      refreshLogs();
-    }
+    showConfirm({
+      title: 'Clear System Audit Logs?',
+      message: 'Are you sure you want to clear all system audit logs? This action is recorded in immutable security backup.',
+      confirmText: 'Clear Logs',
+      cancelText: 'Cancel',
+      isDestructive: true,
+      onConfirm: () => {
+        auditLogger.clearLogs();
+        refreshLogs();
+        showToast('System audit logs cleared.', 'info');
+      }
+    });
   };
 
   const handleExportLogs = () => {
@@ -54,6 +64,7 @@ export const AdminAuditPanel: React.FC<AdminAuditPanelProps> = ({ userProfile })
     a.download = `jeevancare_audit_logs_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast('Exported audit logs JSON file.', 'success');
   };
 
   const handleAddDemoLog = () => {

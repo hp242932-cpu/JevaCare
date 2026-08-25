@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Menu, X, ArrowDown, Sparkles, Check, HeartPulse, ShieldAlert, Stethoscope } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface AuraiHeroProps {
   onExploreEcosystem?: () => void;
@@ -14,6 +15,7 @@ export const AuraiHero: React.FC<AuraiHeroProps> = React.memo(({
   onOpenAuth,
   onSelectTab
 }) => {
+  const { showToast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -32,10 +34,11 @@ export const AuraiHero: React.FC<AuraiHeroProps> = React.memo(({
   const handleJoinListSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!email.trim() || !email.includes('@')) {
-      alert('Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'warning');
       return;
     }
     setIsSubmitted(true);
+    showToast('Thank you for joining the early access waitlist!', 'success');
     if (submitTimerRef.current) clearTimeout(submitTimerRef.current);
     submitTimerRef.current = setTimeout(() => {
       setIsSubmitted(false);
@@ -325,11 +328,17 @@ export const AuraiHero: React.FC<AuraiHeroProps> = React.memo(({
 
       {/* Modal Dialogs for Story, Benefits, Connect */}
       {activeModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xl flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeModal === 'story' ? 'The Jevan Care Story' : activeModal === 'benefits' ? 'Key Benefits' : 'Connect with Jevan Care'}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-up"
+        >
           <div className="bg-slate-900 border border-white/20 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-white space-y-4 shadow-2xl relative">
             <button
               onClick={() => setActiveModal(null)}
-              className="absolute top-4 right-4 p-2 text-white/60 hover:text-white rounded-full bg-white/10"
+              aria-label="Close dialog"
+              className="absolute top-4 right-4 w-11 h-11 flex items-center justify-center text-white/60 hover:text-white rounded-full bg-white/10 focus-visible:ring-2 focus-visible:ring-white"
             >
               <X className="w-5 h-5" />
             </button>

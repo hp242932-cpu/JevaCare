@@ -29,6 +29,7 @@ import {
   ArrowUpDown
 } from 'lucide-react';
 import { JevanCareLoader } from '../common/JevanCareLoader';
+import { useToast } from '../../context/ToastContext';
 
 // API Key configuration
 const API_KEY =
@@ -536,6 +537,7 @@ function PlacesMapContent({
 }
 
 export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpenEmergency }) => {
+  const { showToast } = useToast();
   // Coordinates & Location state
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number }>(DEFAULT_CENTER);
@@ -664,8 +666,9 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
             setGeoStatus('manual');
             setGeoMessage(`Map centered on manual search: ${results[0].formatted_address}`);
             setRefreshToken(Date.now()); // Trigger fresh places search
+            showToast(`Centered on ${results[0].formatted_address}`, 'success');
           } else {
-            alert(`Could not locate area "${areaInput}". Please check spelling or try a city name.`);
+            showToast(`Could not locate area "${areaInput}". Please check spelling or try a city name.`, 'error');
           }
         });
       } else {

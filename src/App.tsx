@@ -130,12 +130,24 @@ export function App() {
   const [economicProfile, setEconomicProfile] = useState<EconomicProfile | null>(() => {
     return accessibilityIntelligenceService.getStoredEconomicProfile(initialProfile.id);
   });
-  const [activeMedicines, setActiveMedicines] = useState<ActiveMedicine[]>(initialActiveMedicines);
-  const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
-  const [vaultItems, setVaultItems] = useState<VaultItem[]>(initialVaultItems);
-  const [metricLogs, setMetricLogs] = useState<HealthMetricLog[]>(initialMetricLogs);
-  const [riskAlerts, setRiskAlerts] = useState(initialRiskAlerts);
-  const [reminders, setReminders] = useState(initialReminders);
+  const [activeMedicines, setActiveMedicines] = useState<ActiveMedicine[]>(() => {
+    return isDemoMode ? initialActiveMedicines : [];
+  });
+  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    return isDemoMode ? initialAppointments : [];
+  });
+  const [vaultItems, setVaultItems] = useState<VaultItem[]>(() => {
+    return isDemoMode ? initialVaultItems : [];
+  });
+  const [metricLogs, setMetricLogs] = useState<HealthMetricLog[]>(() => {
+    return isDemoMode ? initialMetricLogs : [];
+  });
+  const [riskAlerts, setRiskAlerts] = useState(() => {
+    return isDemoMode ? initialRiskAlerts : [];
+  });
+  const [reminders, setReminders] = useState(() => {
+    return isDemoMode ? initialReminders : [];
+  });
 
   const handleRoleChange = useCallback((newRole: RoleType) => {
     setActiveRole(newRole);
@@ -159,6 +171,12 @@ export function App() {
       }
     } else if (isDemoMode) {
       setUserProfile(initialProfile);
+      setActiveMedicines(initialActiveMedicines);
+      setAppointments(initialAppointments);
+      setVaultItems(initialVaultItems);
+      setMetricLogs(initialMetricLogs);
+      setRiskAlerts(initialRiskAlerts);
+      setReminders(initialReminders);
     }
   }, [authProfile, isDemoMode]);
 
@@ -190,12 +208,18 @@ export function App() {
         ]);
 
         if (isMounted) {
-          if (dbProfile) setUserProfile(dbProfile);
-          if (dbMeds && dbMeds.length > 0) setActiveMedicines(dbMeds);
-          if (dbVault && dbVault.length > 0) setVaultItems(dbVault);
-          if (dbApps && dbApps.length > 0) setAppointments(dbApps);
-          if (dbMetrics && dbMetrics.length > 0) setMetricLogs(dbMetrics);
-          if (dbReminders && dbReminders.length > 0) setReminders(dbReminders);
+          if (dbProfile) {
+            setUserProfile(dbProfile);
+          } else if (authProfile) {
+            setUserProfile(authProfile);
+          }
+          // Real user data isolation: if user has 0 items, keep array empty ([]) so no demo data leaks
+          setActiveMedicines(dbMeds || []);
+          setVaultItems(dbVault || []);
+          setAppointments(dbApps || []);
+          setMetricLogs(dbMetrics || []);
+          setReminders(dbReminders || []);
+          setRiskAlerts([]);
         }
       } catch (err) {
         console.warn('Supabase sync error, operating in offline fallback mode:', err);
@@ -207,16 +231,24 @@ export function App() {
     return () => {
       isMounted = false;
     };
-  }, [isAccountMode, user?.id]);
+  }, [isAccountMode, user?.id, authProfile]);
 
   // Handlers (Strictly separate Real DB writes from Demo Mode local writes)
   const handleMarkDoseTaken = useCallback((medId: string) => {
+    let newDoses = 0;
     setActiveMedicines((prev) =>
-      prev.map((m) =>
-        m.id === medId ? { ...m, remainingDoses: Math.max(0, m.remainingDoses - 1) } : m
-      )
+      prev.map((m) => {
+        if (m.id === medId) {
+          newDoses = Math.max(0, m.remainingDoses - 1);
+          return { ...m, remainingDoses: newDoses };
+        }
+        return m;
+      })
     );
-  }, []);
+    if (isAccountMode && user?.id) {
+      supabaseMedicines.updateMedicineDose(user.id, medId, newDoses);
+    }
+  }, [isAccountMode, user?.id]);
 
   const handleAddActiveMedicine = useCallback((newMed: ActiveMedicine) => {
     setActiveMedicines((prev) => [newMed, ...prev]);
@@ -257,7 +289,10 @@ export function App() {
 
   const handleDeleteVaultItem = useCallback((id: string) => {
     setVaultItems((prev) => prev.filter((i) => i.id !== id));
-  }, []);
+    if (isAccountMode && user?.id) {
+      supabaseVault.deleteVaultItem(user.id, id);
+    }
+  }, [isAccountMode, user?.id]);
 
   const handleBookAppointment = useCallback((newApp: Appointment) => {
     setAppointments((prev) => [newApp, ...prev]);

@@ -36,6 +36,7 @@ import {
 } from '../../types';
 import { supabaseBloodDonation } from '../../services/supabaseService';
 import { auditLogger } from '../../services/AuditLogger';
+import { useToast } from '../../context/ToastContext';
 
 interface BloodDonationNetworkProps {
   userProfile: UserProfile;
@@ -48,6 +49,7 @@ export const BloodDonationNetwork: React.FC<BloodDonationNetworkProps> = ({
   userProfile,
   onOpenEmergency
 }) => {
+  const { showToast } = useToast();
   const [donorProfile, setDonorProfile] = useState<BloodDonor | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [matchedRequests, setMatchedRequests] = useState<BloodRequest[]>([]);
@@ -254,7 +256,7 @@ export const BloodDonationNetwork: React.FC<BloodDonationNetworkProps> = ({
   const handleCreateOrgRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!orgName.trim() || !reqHospital.trim() || !reqContactEmail.trim()) {
-      alert('Please fill in all required organization fields.');
+      showToast('Please fill in all required organization fields.', 'warning');
       return;
     }
 

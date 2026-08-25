@@ -14,11 +14,13 @@ import {
   Trash2,
   Sparkles,
   Smartphone,
-  ArrowRight
+  ArrowRight,
+  X
 } from 'lucide-react';
 import { UserProfile, VaultItem } from '../../types';
 import { auditLogger } from '../../services/AuditLogger';
 import { JevanCareLoader } from '../common/JevanCareLoader';
+import { useToast } from '../../context/ToastContext';
 
 interface AbhaLinkingCardProps {
   userProfile?: UserProfile;
@@ -31,6 +33,7 @@ export const AbhaLinkingCard: React.FC<AbhaLinkingCardProps> = ({
   onUpdateProfile,
   onAddVaultItem,
 }) => {
+  const { showToast, showConfirm } = useToast();
   const [activeTab, setActiveTab] = useState<'link' | 'create'>('link');
   
   // Link existing state
@@ -176,23 +179,31 @@ export const AbhaLinkingCard: React.FC<AbhaLinkingCardProps> = ({
   };
 
   const handleUnlinkAbha = () => {
-    if (window.confirm('Are you sure you want to unlink your ABHA Health ID? Health records already saved in your vault will remain.')) {
-      const updated: UserProfile = {
-        ...(userProfile || { id: 'u1', name: 'User', email: 'user@example.com', role: 'patient' }),
-        abhaNumber: undefined,
-        abhaAddress: undefined,
-        abhaLinked: false,
-        abhaLinkedAt: undefined,
-      };
+    showConfirm({
+      title: 'Unlink ABHA Health ID?',
+      message: 'Are you sure you want to unlink your ABHA Health ID? Health records already saved in your vault will remain.',
+      confirmText: 'Unlink ABHA',
+      cancelText: 'Keep Linked',
+      isDestructive: true,
+      onConfirm: () => {
+        const updated: UserProfile = {
+          ...(userProfile || { id: 'u1', name: 'User', email: 'user@example.com', role: 'patient' }),
+          abhaNumber: undefined,
+          abhaAddress: undefined,
+          abhaLinked: false,
+          abhaLinkedAt: undefined,
+        };
 
-      onUpdateProfile(updated);
-      auditLogger.logAction(
-        'ABHA_UNLINKED',
-        `Unlinked ABHA ID from profile at user request.`,
-        updated,
-        'WARNING'
-      );
-    }
+        onUpdateProfile(updated);
+        showToast('ABHA Health ID unlinked successfully.', 'info');
+        auditLogger.logAction(
+          'ABHA_UNLINKED',
+          `Unlinked ABHA ID from profile at user request.`,
+          updated,
+          'WARNING'
+        );
+      }
+    });
   };
 
   const handleSyncGovernmentRecords = () => {
@@ -706,14 +717,19 @@ export const AbhaLinkingCard: React.FC<AbhaLinkingCardProps> = ({
             {/* Action Buttons */}
             <div className="flex gap-2">
               <button
-                onClick={() => alert('Printing digital ABHA Health Card...')}
-                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5"
+                type="button"
+                onClick={() => {
+                  showToast('Preparing official ABHA Health Card for download...', 'success');
+                  window.print?.();
+                }}
+                className="flex-1 min-h-[44px] py-2.5 bg-[#f3efe6] dark:bg-[#1d2d24] text-[#142b20] dark:text-[#f2efe9] font-semibold text-xs rounded-xl hover:bg-[#e8e2d7] dark:hover:bg-[#25382d] transition-colors flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
               >
                 <Download className="w-4 h-4" /> Download PDF
               </button>
               <button
+                type="button"
                 onClick={() => setShowCardModal(false)}
-                className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-xl transition-colors"
+                className="flex-1 min-h-[44px] py-2.5 bg-[#1a5336] hover:bg-[#143e29] text-white font-semibold text-xs rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
               >
                 Close Card
               </button>

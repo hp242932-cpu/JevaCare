@@ -94,48 +94,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <section className="bg-white dark:bg-[#16241c] border border-[#e6dfd3] dark:border-[#283c2e] rounded-3xl p-6 sm:p-8 shadow-xs transition-colors relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           
-          <div className="space-y-2.5 min-w-0 flex-1">
+          <div className="space-y-3 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#5c5647] dark:text-[#c0b9ad]">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Health Status: Stable & Optimal
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400"></span>
+                Clinical Status: Stable & In Range
               </span>
               <span>•</span>
-              <span className="font-bold text-[#1b3b2b] dark:text-white">Score: {healthScore}/100</span>
+              <span className="font-bold text-[#142b20] dark:text-[#f2f0e8]">ABHA: {profile.abhaId || '91-4829-1049-3821'}</span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif-editorial font-bold text-[#1b3b2b] dark:text-[#f2f0e8] tracking-tight">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif-editorial font-bold text-[#142b20] dark:text-[#f2f0e8] tracking-tight">
               Good day, {profile.name}
             </h1>
             
-            <p className="text-sm text-[#5c5647] dark:text-[#c0b9ad] max-w-2xl leading-relaxed">
-              Your health vitals are in target range. You have {safeActiveMedicines.length} active routine {safeActiveMedicines.length === 1 ? 'medication' : 'medications'} scheduled today and {safeVaultItems.length} encrypted records in your vault.
+            <p className="text-sm sm:text-base text-[#5c5647] dark:text-[#c0b9ad] max-w-2xl leading-relaxed">
+              Your logged vitals remain in target ranges. You have {safeActiveMedicines.length} active {safeActiveMedicines.length === 1 ? 'medication' : 'medications'} scheduled today and {safeVaultItems.length} encrypted health records securely stored in your vault.
             </p>
 
-            {/* Live Vital Badges */}
-            <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#1b3b2b] dark:text-[#f2f0e8]">
-                <Activity className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
+            {/* Live Vital Badges (Meaningful clinical parameters) */}
+            <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs sm:text-sm">
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#142b20] dark:text-[#f2f0e8]">
+                <Activity className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
                 <span>BP: <strong>118/76 mmHg</strong></span>
               </span>
 
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#1b3b2b] dark:text-[#f2f0e8]">
-                <HeartPulse className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#142b20] dark:text-[#f2f0e8]">
+                <HeartPulse className="w-4 h-4 text-rose-600 dark:text-rose-400" />
                 <span>Sugar: <strong>92 mg/dL</strong></span>
               </span>
 
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#1b3b2b] dark:text-[#f2f0e8]">
-                <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#142b20] dark:text-[#f2f0e8]">
+                <CheckCircle2 className="w-4 h-4 text-blue-700 dark:text-blue-400" />
                 <span>Adherence: <strong>94% Streak</strong></span>
               </span>
             </div>
           </div>
 
           {/* Quick Primary Shortcuts */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0">
             <button
               onClick={() => setActiveTab('scanner')}
-              className="px-4 py-2.5 bg-[#1b3b2b] hover:bg-[#244836] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer border border-[#1b3b2b]"
+              className="min-h-[44px] px-4 py-2.5 bg-[#1a5336] hover:bg-[#143e29] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer border border-[#1a5336] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
               aria-label="Scan Prescription"
             >
               <ScanLine className="w-4 h-4 text-emerald-300" />
@@ -144,16 +144,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <button
               onClick={() => setActiveTab('assistant')}
-              className="px-4 py-2.5 bg-white dark:bg-[#1e3025] hover:bg-[#f6f2e9] text-[#1b3b2b] dark:text-white text-xs font-bold rounded-xl border border-[#e6dfd3] dark:border-[#2b4233] transition-all flex items-center gap-2 cursor-pointer"
+              className="min-h-[44px] px-4 py-2.5 bg-white dark:bg-[#1e3025] hover:bg-[#f6f2e9] text-[#142b20] dark:text-white text-xs sm:text-sm font-bold rounded-xl border border-[#e6dfd3] dark:border-[#2b4233] transition-all flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
               aria-label="Ask Health Assistant"
             >
-              <Bot className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <Bot className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
               <span>Ask Assistant</span>
             </button>
 
             <button
               onClick={onOpenEmergency}
-              className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900 transition-all cursor-pointer"
+              className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 border border-rose-200 dark:border-rose-900 transition-all cursor-pointer flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
               title="Emergency SOS Hub"
               aria-label="Emergency SOS"
             >
@@ -164,17 +164,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* 2. WHAT SHOULD I DO NEXT? (Contextual Prioritized Action Card) */}
-        <div className="mt-6 pt-5 border-t border-[#e6dfd3]/80 dark:border-[#283c2e] bg-[#fcfaf6] dark:bg-[#192b20] -mx-6 sm:-mx-8 -mb-6 sm:-mb-8 p-5 sm:p-6 rounded-b-3xl">
+        <div className="mt-6 pt-5 border-t border-[#e6dfd3] dark:border-[#283c2e] bg-[#fcfaf6] dark:bg-[#192b20] -mx-6 sm:-mx-8 -mb-6 sm:-mb-8 p-5 sm:p-6 rounded-b-3xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shrink-0 mt-0.5">
-                <Zap className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
+            <div className="flex items-start gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center shrink-0 mt-0.5 border border-[#d2ded0] dark:border-[#2a4435]">
+                <Zap className="w-5 h-5 text-[#1a5336] dark:text-[#a3d4b6]" />
               </div>
               <div>
-                <span className="text-[10px] uppercase font-extrabold tracking-wider text-emerald-800 dark:text-emerald-400">
+                <span className="text-xs uppercase font-extrabold tracking-wider text-[#1a5336] dark:text-[#a3d4b6]">
                   Recommended Next Action
                 </span>
-                <p className="font-bold text-xs sm:text-sm text-[#1b3b2b] dark:text-white">
+                <p className="font-bold text-sm sm:text-base text-[#142b20] dark:text-white mt-0.5">
                   {nextMedicine ? (
                     `Take ${nextMedicine.name} (${nextMedicine.dosage}) — ${nextMedicine.frequency}`
                   ) : nextAppointment ? (
@@ -183,11 +183,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     `Upload your latest prescription or health report to your encrypted vault`
                   )}
                 </p>
-                <p className="text-[11px] text-[#827b6c] dark:text-slate-400 mt-0.5">
+                <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] mt-0.5">
                   {nextMedicine ? (
-                    `Salt: ${nextMedicine.salt} • Instruction: ${nextMedicine.instructions || 'Take with water'}`
+                    `Salt: ${nextMedicine.salt} • Instruction: ${nextMedicine.instructions || 'Take with water after food'}`
                   ) : (
-                    `AI OCR will automatically catalog medicines, salts, and safety contraindications.`
+                    `AI OCR automatically categorizes medicines, active salts, and contraindications.`
                   )}
                 </p>
               </div>
@@ -197,17 +197,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {nextMedicine ? (
                 <button
                   onClick={() => onMarkDoseTaken(nextMedicine.id)}
-                  className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 bg-[#1a5336] hover:bg-[#143e29] text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 shadow-2xs transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
                   <span>Mark Dose Taken</span>
                 </button>
               ) : (
                 <button
                   onClick={() => setActiveTab('scanner')}
-                  className="px-3.5 py-2 bg-[#1b3b2b] hover:bg-[#244836] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 bg-[#1a5336] hover:bg-[#143e29] text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 shadow-2xs transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                 >
-                  <ScanLine className="w-3.5 h-3.5 text-emerald-300" />
+                  <ScanLine className="w-4 h-4 text-emerald-300" />
                   <span>Scan New Rx</span>
                 </button>
               )}
@@ -378,14 +378,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {safeActiveMedicines.length === 0 ? (
-              <div className="py-8 text-center text-[#827b6c] dark:text-[#969082]">
-                <Pill className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p className="text-sm font-medium">No active medications scheduled for today</p>
+              <div className="py-8 px-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] text-center">
+                <div className="w-12 h-12 rounded-2xl bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center mx-auto mb-3">
+                  <Pill className="w-6 h-6" />
+                </div>
+                <h4 className="font-bold text-sm sm:text-base text-[#142b20] dark:text-[#f2f0e8]">
+                  No active routine medications
+                </h4>
+                <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] max-w-sm mx-auto mt-1">
+                  You have not scheduled any daily prescriptions yet. Adding your medications enables dose adherence tracking, interaction alerts, and refill reminders.
+                </p>
                 <button
                   onClick={() => setActiveTab('scanner')}
-                  className="mt-3 text-xs font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
+                  className="min-h-[44px] mt-4 px-4 py-2 bg-[#1a5336] hover:bg-[#143e29] text-white text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition-all inline-flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                 >
-                  Scan a prescription to add routine doses
+                  <ScanLine className="w-4 h-4 text-emerald-300" />
+                  <span>Scan Prescription to Add Routine</span>
                 </button>
               </div>
             ) : (
@@ -393,27 +401,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {safeActiveMedicines.slice(0, 4).map((med) => (
                   <div
                     key={med.id}
-                    className="flex items-center justify-between p-3.5 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] gap-3 transition-colors"
+                    className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] gap-3 transition-colors"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-xs sm:text-sm text-[#1b3b2b] dark:text-[#f2f0e8] truncate">
+                        <p className="font-bold text-xs sm:text-sm text-[#142b20] dark:text-[#f2f0e8] truncate">
                           {med.name}
                         </p>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#e8eee5] dark:bg-[#23382b] text-[#2b503b] dark:text-[#a3d4b6]">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6]">
                           {med.dosage}
                         </span>
                       </div>
-                      <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] truncate mt-0.5">
-                        {med.frequency} • {med.salt}
+                      <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] truncate mt-0.5">
+                        {med.frequency} • Salt: {med.salt}
                       </p>
                     </div>
 
                     <button
                       onClick={() => onMarkDoseTaken(med.id)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                      className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
                       <span>Take Dose</span>
                     </button>
                   </div>
@@ -422,13 +430,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
 
-          <div className="pt-4 mt-4 border-t border-[#e6dfd3] dark:border-[#283c2e] flex items-center justify-between text-xs text-[#5c5647] dark:text-[#c0b9ad]">
-            <span>Active routine: {safeActiveMedicines.length} items</span>
+          <div className="pt-4 mt-4 border-t border-[#e6dfd3] dark:border-[#283c2e] flex items-center justify-between text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad]">
+            <span>Active routine: <strong>{safeActiveMedicines.length}</strong> items</span>
             <button
               onClick={() => setActiveTab('scanner')}
-              className="font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1"
+              className="font-bold text-[#1a5336] dark:text-[#a3d4b6] hover:underline flex items-center gap-1 focus-visible:outline-none"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               <span>Add from Prescription</span>
             </button>
           </div>
@@ -439,14 +447,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-[#e6dfd3] dark:border-[#283c2e] mb-4">
               <div className="flex items-center gap-2">
-                <Stethoscope className="w-5 h-5 text-[#1b3b2b] dark:text-[#a3d4b6]" />
-                <h2 className="font-bold text-base text-[#1b3b2b] dark:text-[#f2f0e8]">
+                <Stethoscope className="w-5 h-5 text-[#1a5336] dark:text-[#a3d4b6]" />
+                <h2 className="font-bold text-base sm:text-lg text-[#142b20] dark:text-[#f2f0e8]">
                   Care & Consultations
                 </h2>
               </div>
               <button
                 onClick={() => setActiveTab('doctors')}
-                className="text-xs font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline flex items-center gap-1"
+                className="text-xs sm:text-sm font-bold text-[#1a5336] dark:text-[#a3d4b6] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Find Doctors</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -458,46 +466,49 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {upcomingApps.slice(0, 2).map((app) => (
                   <div
                     key={app.id}
-                    className="p-3.5 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] space-y-1.5"
+                    className="p-3.5 sm:p-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] space-y-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <p className="font-bold text-xs sm:text-sm text-[#1b3b2b] dark:text-[#f2f0e8]">
+                      <p className="font-bold text-xs sm:text-sm text-[#142b20] dark:text-[#f2f0e8]">
                         {app.doctorName}
                       </p>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
                         {app.specialty}
                       </span>
                     </div>
-                    <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad]">
+                    <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad]">
                       {app.date} at {app.time} • {app.mode} Consultation
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="p-4 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] text-center py-6">
-                <Calendar className="w-8 h-8 mx-auto mb-2 text-[#827b6c] dark:text-[#969082] opacity-40" />
-                <p className="font-bold text-sm text-[#1b3b2b] dark:text-[#f2f0e8]">
+              <div className="p-6 rounded-2xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#2a3f32] text-center">
+                <div className="w-12 h-12 rounded-2xl bg-[#e8eee5] dark:bg-[#23382b] text-[#1a5336] dark:text-[#a3d4b6] flex items-center justify-center mx-auto mb-3">
+                  <Calendar className="w-6 h-6" />
+                </div>
+                <h4 className="font-bold text-sm sm:text-base text-[#142b20] dark:text-[#f2f0e8]">
                   No upcoming appointments scheduled
-                </p>
-                <p className="text-xs text-[#5c5647] dark:text-[#c0b9ad] mt-1 max-w-xs mx-auto">
-                  Consult with top verified specialists for second opinions or regular health checkups.
+                </h4>
+                <p className="text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad] mt-1 max-w-xs mx-auto">
+                  Consult with top verified specialists for second opinions, routine health checkups, or teleconsultations.
                 </p>
                 <button
                   onClick={() => setActiveTab('doctors')}
-                  className="mt-3 px-3 py-1.5 bg-[#1b3b2b] hover:bg-[#244836] text-white text-xs font-bold rounded-xl transition-all"
+                  className="min-h-[44px] mt-4 px-4 py-2 bg-[#1a5336] hover:bg-[#143e29] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-2xs inline-flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
                 >
-                  Book Doctor Consultation
+                  <Stethoscope className="w-4 h-4 text-emerald-300" />
+                  <span>Book Doctor Consultation</span>
                 </button>
               </div>
             )}
           </div>
 
-          <div className="pt-4 mt-4 border-t border-[#e6dfd3] dark:border-[#283c2e] flex items-center justify-between text-xs text-[#5c5647] dark:text-[#c0b9ad]">
+          <div className="pt-4 mt-4 border-t border-[#e6dfd3] dark:border-[#283c2e] flex items-center justify-between text-xs sm:text-sm text-[#5c5647] dark:text-[#c0b9ad]">
             <span>Telehealth & In-clinic support</span>
             <button
               onClick={() => setActiveTab('doctors')}
-              className="font-bold text-[#1b3b2b] dark:text-[#a3d4b6] hover:underline"
+              className="font-bold text-[#1a5336] dark:text-[#a3d4b6] hover:underline"
             >
               Browse Specialists →
             </button>

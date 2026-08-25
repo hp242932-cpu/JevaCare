@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   CheckCircle2,
@@ -92,36 +92,58 @@ export const DoctorProfileModal: React.FC<DoctorProfileModalProps> = ({
     }, 1800);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto animate-in fade-in">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative my-6">
-        
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="doctor-profile-modal-title"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto animate-in fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="bg-white dark:bg-[#16241c] w-full max-w-2xl rounded-t-3xl sm:rounded-3xl shadow-2xl border border-[#e6dfd3] dark:border-[#283c2e] overflow-hidden relative sm:my-6 max-h-[92dvh] sm:max-h-[85vh] flex flex-col"
+        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+      >
+        {/* Mobile Swipe / Drag Handle Indicator */}
+        <div className="w-12 h-1.5 bg-[#d2ded0] dark:bg-[#2a4435] rounded-full mx-auto my-2 sm:hidden shrink-0" />
+
         {/* Header */}
-        <div className="p-5 bg-gradient-to-r from-emerald-800 to-teal-800 text-white flex items-center justify-between">
+        <div className="p-4 sm:p-5 bg-[#1a5336] dark:bg-[#153424] text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <DoctorAvatar doctor={doctor} size="md" showVerifiedBadge={true} />
             <div>
-              <h3 className="font-bold text-lg">{doctor.name}</h3>
-              <p className="text-xs text-emerald-100">{doctor.specialty} • {doctor.qualification}</p>
+              <h3 id="doctor-profile-modal-title" className="font-bold text-base sm:text-lg font-serif-editorial">{doctor.name}</h3>
+              <p className="text-xs text-emerald-200">{doctor.specialty} • {doctor.qualification}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full text-emerald-100 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close doctor profile modal"
+            className="min-h-[44px] min-w-[44px] p-2 rounded-full text-emerald-100 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto text-xs">
+        <div className="p-4 sm:p-6 space-y-6 overflow-y-auto text-xs flex-1">
 
           {/* Doctor Verification Header Banner */}
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-4 rounded-xl bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#283c2e] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 {isVerified ? (
-                  <span className="inline-flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400 text-xs">
+                  <span className="inline-flex items-center gap-1 font-bold text-emerald-800 dark:text-emerald-400 text-xs">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Verified Medical Doctor
                   </span>
                 ) : (
@@ -130,14 +152,14 @@ export const DoctorProfileModal: React.FC<DoctorProfileModalProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+              <p className="text-[11px] text-[#827b6c] dark:text-[#969082] font-mono">
                 Reg No: {doctor.registrationNumber || 'Pending'} ({doctor.registrationAuthority || 'Medical Council'})
               </p>
             </div>
 
-            <div className="text-right shrink-0">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Consultation Fee</span>
-              <span className="font-extrabold text-slate-900 dark:text-white text-base">
+            <div className="text-left sm:text-right shrink-0">
+              <span className="text-[10px] text-[#827b6c] dark:text-[#969082] uppercase tracking-wider block">Consultation Fee</span>
+              <span className="font-extrabold text-[#142b20] dark:text-[#f2f0e8] text-base">
                 ₹{doctor.fees.toLocaleString('en-IN')}
               </span>
             </div>
@@ -147,24 +169,24 @@ export const DoctorProfileModal: React.FC<DoctorProfileModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             <div className="space-y-2">
-              <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block">Practice Location</span>
-              <p className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="font-bold text-[#827b6c] dark:text-[#969082] uppercase tracking-wider text-[10px] block">Practice Location</span>
+              <p className="font-semibold text-[#142b20] dark:text-[#f2f0e8] flex items-center gap-1.5">
+                <Building className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
                 {doctor.hospital}
               </p>
-              <p className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pl-5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <p className="text-[#5c5647] dark:text-[#c0b9ad] flex items-center gap-1.5 pl-5">
+                <MapPin className="w-3.5 h-3.5 text-[#827b6c] shrink-0" />
                 {doctor.address || `${doctor.city}, ${doctor.state}`}
               </p>
             </div>
 
             <div className="space-y-2">
-              <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block">Languages & Experience</span>
-              <p className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
-                <Languages className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="font-bold text-[#827b6c] dark:text-[#969082] uppercase tracking-wider text-[10px] block">Languages & Experience</span>
+              <p className="font-semibold text-[#142b20] dark:text-[#f2f0e8] flex items-center gap-1.5">
+                <Languages className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
                 {doctor.languages ? doctor.languages.join(', ') : 'Hindi, English'}
               </p>
-              <p className="text-slate-500 dark:text-slate-400 pl-5">
+              <p className="text-[#5c5647] dark:text-[#c0b9ad] pl-5">
                 {doctor.experienceYears} Years Clinical Experience
               </p>
             </div>
@@ -173,38 +195,38 @@ export const DoctorProfileModal: React.FC<DoctorProfileModalProps> = ({
 
           {/* Bio */}
           {doctor.about && (
-            <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block">About & Clinical Expertise</span>
-              <p className="text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+            <div className="space-y-1 pt-2 border-t border-[#e6dfd3] dark:border-[#283c2e]">
+              <span className="font-bold text-[#827b6c] dark:text-[#969082] uppercase tracking-wider text-[10px] block">About & Clinical Expertise</span>
+              <p className="text-[#5c5647] dark:text-[#c0b9ad] leading-relaxed bg-[#fcfaf6] dark:bg-[#1d2e23] p-3 rounded-xl border border-[#e6dfd3] dark:border-[#283c2e]">
                 {doctor.about}
               </p>
             </div>
           )}
 
           {/* Booking Form */}
-          <form onSubmit={handleConfirmBooking} className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
-            <h4 className="font-bold text-sm text-slate-800 dark:text-white flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-emerald-600" />
+          <form onSubmit={handleConfirmBooking} className="pt-4 border-t border-[#e6dfd3] dark:border-[#283c2e] space-y-4">
+            <h4 className="font-bold text-sm text-[#142b20] dark:text-[#f2f0e8] flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
               Book Appointment Slot
             </h4>
 
             {doubleBookError && (
               <div className="p-3 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 text-xs font-semibold flex items-center gap-2 border border-rose-200">
-                <AlertCircle className="w-4 h-4" />
+                <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{doubleBookError}</span>
               </div>
             )}
 
             {bookingSuccess && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 border border-emerald-200">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <div className="p-3.5 rounded-xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-bold flex items-center gap-2 border border-emerald-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Appointment successfully booked! Syncing with Doctor Portal...</span>
               </div>
             )}
 
             {/* Mode Selector */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-[#142b20] dark:text-[#f2f0e8] mb-1">
                 Consultation Mode
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -213,10 +235,10 @@ export const DoctorProfileModal: React.FC<DoctorProfileModalProps> = ({
                     key={mode}
                     type="button"
                     onClick={() => setConsultType(mode)}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                    className={`min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336] ${
                       consultType === mode
-                        ? 'bg-emerald-700 text-white border-emerald-800 shadow-xs'
-                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                        ? 'bg-[#1a5336] text-white border-[#143e29] shadow-xs'
+                        : 'bg-[#fcfaf6] dark:bg-[#1d2e23] text-[#5c5647] dark:text-[#c0b9ad] border-[#e6dfd3] dark:border-[#283c2e]'
                     }`}
                   >
                     {mode}
@@ -236,7 +258,7 @@ export const DoctorProfileModal: React.FC<DoctorProfileModalProps> = ({
 
             {/* Reason for visit */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-[#142b20] dark:text-[#f2f0e8] mb-1">
                 Consultation Reason / Symptoms Overview
               </label>
               <textarea
@@ -244,14 +266,14 @@ export const DoctorProfileModal: React.FC<DoctorProfileModalProps> = ({
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Describe your health symptoms or reason for follow-up..."
                 rows={2}
-                className="w-full p-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100"
+                className="w-full p-3 text-xs bg-[#fcfaf6] dark:bg-[#1d2e23] border border-[#e6dfd3] dark:border-[#283c2e] rounded-xl text-[#142b20] dark:text-[#f2f0e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
               />
             </div>
 
             <button
               type="submit"
               disabled={isSlotBooked || bookingSuccess}
-              className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-700/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full min-h-[48px] py-3 bg-[#1a5336] hover:bg-[#143e29] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a5336]"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>

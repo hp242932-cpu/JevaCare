@@ -16,6 +16,7 @@ import {
   IncomeBracket
 } from '../../types';
 import { accessibilityIntelligenceService } from '../../services/accessibilityIntelligenceService';
+import { useToast } from '../../context/ToastContext';
 
 interface EconomicAffordabilityModalProps {
   isOpen: boolean;
@@ -70,6 +71,7 @@ export const EconomicAffordabilityModal: React.FC<EconomicAffordabilityModalProp
   currentProfile,
   onProfileUpdated
 }) => {
+  const { showToast, showConfirm } = useToast();
   const [monthlyIncome, setMonthlyIncome] = useState<number>(
     currentProfile?.monthlyHouseholdIncome || 28000
   );
@@ -148,11 +150,19 @@ export const EconomicAffordabilityModal: React.FC<EconomicAffordabilityModalProp
   };
 
   const handleClear = () => {
-    if (window.confirm('Are you sure you want to delete your voluntary economic profile? All matched scheme calculations will revert to general citizen baselines.')) {
-      accessibilityIntelligenceService.clearEconomicProfile(userId);
-      onProfileUpdated(null);
-      onClose();
-    }
+    showConfirm({
+      title: 'Delete Economic Profile?',
+      message: 'Are you sure you want to delete your voluntary economic profile? All matched scheme calculations will revert to general citizen baselines.',
+      confirmText: 'Delete Profile',
+      cancelText: 'Keep Profile',
+      isDestructive: true,
+      onConfirm: () => {
+        accessibilityIntelligenceService.clearEconomicProfile(userId);
+        onProfileUpdated(null);
+        showToast('Economic profile cleared.', 'info');
+        onClose();
+      }
+    });
   };
 
   return (
