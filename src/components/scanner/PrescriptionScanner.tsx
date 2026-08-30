@@ -47,6 +47,7 @@ import { auditLogger } from '../../services/AuditLogger';
 import { JevanCareLoader } from '../common/JevanCareLoader';
 import { MedicinePharmacyMap } from './MedicinePharmacyMap';
 import { MedicinePriceSearch } from './MedicinePriceSearch';
+import { useUserLocation } from '../../context/LocationContext';
 
 interface PrescriptionScannerProps {
   onAddActiveMedicine: (med: ActiveMedicine) => void;
@@ -68,13 +69,17 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
-  // GPS & Pharmacy Search State
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; label: string }>({
-    lat: 26.8688,
-    lng: 80.9125,
-    label: 'KGMU Campus, Chowk, Lucknow'
-  });
-  const [isLocating, setIsLocating] = useState<boolean>(false);
+  // GPS & Pharmacy Search State from Central Single-Source-of-Truth LocationContext
+  const {
+    location,
+    status: locationStatus,
+    statusMessage: locationStatusMessage,
+    refreshLocation,
+    isLoading: isLocating,
+    addressLabel,
+    accuracyQuality,
+  } = useUserLocation();
+
   const [isSearchingPharmacy, setIsSearchingPharmacy] = useState<boolean>(false);
   const [pharmacySearchData, setPharmacySearchData] = useState<{
     medicineResults: MedicinePharmacyComparison[];
@@ -224,11 +229,24 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
 
   const handleSearchPharmacyPrices = useCallback(async (
     medicinesList: ExtractedMedicineItem[],
-    lat = userLocation.lat,
-    lng = userLocation.lng,
+    lat = location?.latitude,
+    lng = location?.longitude,
     filter = searchFilter
   ) => {
     if (!medicinesList || medicinesList.length === 0) return;
+
+    let targetLat = lat;
+    let targetLng = lng;
+
+    if (targetLat === undefined || targetLng === undefined) {
+      const fresh = await refreshLocation();
+      if (fresh) {
+        targetLat = fresh.latitude;
+        targetLng = fresh.longitude;
+      } else {
+        return;
+      }
+    }
 
     setIsSearchingPharmacy(true);
     try {
@@ -237,9 +255,8 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           medicines: medicinesList,
-          userLat: lat,
-          userLng: lng,
-          city: 'Lucknow',
+          userLat: targetLat,
+          userLng: targetLng,
           sortBy: filter,
         }),
       });
@@ -264,48 +281,31 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
         setIsSearchingPharmacy(false);
       }
     }
-  }, [userLocation.lat, userLocation.lng, searchFilter]);
+  }, [location?.latitude, location?.longitude, searchFilter, refreshLocation]);
 
-  const fetchUserLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      if (isMountedRef.current) {
-        setUserLocation({ lat: 26.8688, lng: 80.9125, label: 'Lucknow Central (GPS Default)' });
-      }
-      return;
-    }
-
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (!isMountedRef.current) return;
-        const newLoc = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          label: `GPS (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`
-        };
-        setUserLocation(newLoc);
-        setIsLocating(false);
-
-        // Auto re-search pharmacy prices with fresh coordinates if scanResult exists
-        if (scanResult && scanResult.medicines.length > 0) {
-          handleSearchPharmacyPrices(scanResult.medicines, newLoc.lat, newLoc.lng, searchFilter);
-        }
-      },
-      (err) => {
-        console.warn('GPS access error:', err);
-        if (isMountedRef.current) {
-          setUserLocation({ lat: 26.8688, lng: 80.9125, label: 'Lucknow Central (GPS Fallback)' });
-          setIsLocating(false);
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
-  }, [scanResult, handleSearchPharmacyPrices, searchFilter]);
-
-  // Initial GPS Location Check
+  // Auto-fetch nearby pharmacy prices and Google Places stores when entering price comparison tab
   useEffect(() => {
-    fetchUserLocation();
-  }, [fetchUserLocation]);
+    if (activeTabMode === 'price_comparison' && !pharmacySearchData && !isSearchingPharmacy && location) {
+      const medsToSearch: ExtractedMedicineItem[] = scanResult?.medicines?.length
+        ? scanResult.medicines
+        : [
+            {
+              name: 'Paracetamol 650mg (Dolo / Jan Aushadhi)',
+              brandName: 'Dolo 650 / Generic Paracetamol',
+              activeIngredient: 'paracetamol',
+              strength: '650mg',
+              dosageForm: 'Tablet',
+              quantity: '10 Tablets',
+              frequency: 'As prescribed',
+              duration: '5 days',
+              status: 'Prescribed medicine',
+              confidence: 'High',
+              isUnclear: false,
+            },
+          ];
+      handleSearchPharmacyPrices(medsToSearch, location.latitude, location.longitude, searchFilter);
+    }
+  }, [activeTabMode, pharmacySearchData, isSearchingPharmacy, scanResult, location, searchFilter, handleSearchPharmacyPrices]);
 
   const handleFileUpload = useCallback((file: File) => {
     if (!file) return;
@@ -372,7 +372,7 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
       );
 
       // Trigger automatic pharmacy price & location search for verified medicines
-      handleSearchPharmacyPrices(formattedResult.medicines, userLocation.lat, userLocation.lng, searchFilter);
+      handleSearchPharmacyPrices(formattedResult.medicines, location?.latitude, location?.longitude, searchFilter);
 
     } catch (err: any) {
       console.error('Scan error:', err);
@@ -384,13 +384,13 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
         setIsScanning(false);
       }
     }
-  }, [selectedImage, textPrompt, mimeType, userLocation.lat, userLocation.lng, searchFilter, handleSearchPharmacyPrices]);
+  }, [selectedImage, textPrompt, mimeType, location?.latitude, location?.longitude, searchFilter, handleSearchPharmacyPrices]);
 
   // Manual search from debounced bar
   const handleManualSearch = (query: string, filter: 'cheapest' | 'nearest' | 'available' | 'best_value') => {
     setSearchFilter(filter);
     if (!query && scanResult?.medicines) {
-      handleSearchPharmacyPrices(scanResult.medicines, userLocation.lat, userLocation.lng, filter);
+      handleSearchPharmacyPrices(scanResult.medicines, location?.latitude, location?.longitude, filter);
       return;
     }
 
@@ -410,7 +410,7 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
       },
     ];
 
-    handleSearchPharmacyPrices(tempMedList, userLocation.lat, userLocation.lng, filter);
+    handleSearchPharmacyPrices(tempMedList, location?.latitude, location?.longitude, filter);
   };
 
   const handleStartEditMedicine = (idx: number, med: ExtractedMedicineItem) => {
@@ -436,7 +436,7 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
     setEditMedForm(null);
 
     // Refresh verified pharmacy price search with user-confirmed medicine details
-    handleSearchPharmacyPrices(updatedMeds, userLocation.lat, userLocation.lng, searchFilter);
+    handleSearchPharmacyPrices(updatedMeds, location?.latitude, location?.longitude, searchFilter);
   };
 
   const handleSaveToVaultAndActive = () => {
@@ -1153,13 +1153,17 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
             {/* Interactive GPS Map View */}
             <div className="lg:col-span-1">
               <MedicinePharmacyMap
-                userLocation={userLocation}
+                userLocation={{
+                  lat: location?.latitude ?? 0,
+                  lng: location?.longitude ?? 0,
+                  label: addressLabel || (location ? `GPS (${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)})` : 'Waiting for GPS...')
+                }}
                 pharmacies={
                   pharmacySearchData?.medicineResults?.[0]?.allPharmacies || []
                 }
                 selectedPharmacyId={selectedPharmacyId}
                 onSelectPharmacy={(id) => setSelectedPharmacyId(id)}
-                onRefreshLocation={fetchUserLocation}
+                onRefreshLocation={refreshLocation}
                 isRefreshingLocation={isLocating}
               />
             </div>
@@ -1337,12 +1341,33 @@ export const PrescriptionScanner: React.FC<PrescriptionScannerProps> = ({
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 text-slate-400 space-y-2">
-                  <Search className="w-10 h-10 mx-auto text-slate-300 stroke-1" />
-                  <p className="text-xs font-semibold">No pharmacy search results found yet.</p>
-                  <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                    Scan a prescription or type a medicine in the search bar above to fetch verified prices and nearby locations.
-                  </p>
+                <div className="text-center py-10 px-4 bg-white dark:bg-slate-800 rounded-2xl border border-stone-200 dark:border-slate-700 text-slate-400 space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto border border-emerald-100 dark:border-emerald-900">
+                    <Search className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No pharmacy search results found yet.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                      Search any medicine name above or tap a quick suggestion below to discover real Google Places pharmacies and verified prices nearby:
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                    {[
+                      { label: 'Paracetamol 650mg', key: 'Paracetamol 650mg' },
+                      { label: 'Amoxicillin 500mg', key: 'Amoxicillin 500mg' },
+                      { label: 'Pantoprazole 40mg', key: 'Pantoprazole 40mg' },
+                      { label: 'Azithromycin 500mg', key: 'Azithromycin 500mg' },
+                      { label: 'Jan Aushadhi Kendra', key: 'Jan Aushadhi' },
+                    ].map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={() => handleManualSearch(item.key, searchFilter)}
+                        className="px-3 py-1.5 rounded-xl bg-stone-100 dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-slate-700 dark:text-slate-200 hover:text-emerald-800 dark:hover:text-emerald-300 font-semibold text-xs border border-stone-200 dark:border-slate-700 hover:border-emerald-300 transition-all cursor-pointer"
+                      >
+                        + {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

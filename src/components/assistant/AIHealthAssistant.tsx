@@ -182,15 +182,24 @@ export const AIHealthAssistant: React.FC<AIHealthAssistantProps> = ({
 
   // Sync state with VoiceAssistantService
   useEffect(() => {
+    isMountedRef.current = true;
     const unsubscribe = voiceAssistant.addStateListener((speaking) => {
-      setIsSpeaking(speaking);
-      if (!speaking) {
-        setCurrentlySpeakingId(null);
+      if (isMountedRef.current) {
+        setIsSpeaking(speaking);
+        if (!speaking) {
+          setCurrentlySpeakingId(null);
+        }
       }
     });
     return () => {
+      isMountedRef.current = false;
       unsubscribe();
       voiceAssistant.stop();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (_) {}
+      }
     };
   }, []);
 

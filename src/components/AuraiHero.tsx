@@ -22,9 +22,28 @@ export const AuraiHero: React.FC<AuraiHeroProps> = React.memo(({
   const [activeModal, setActiveModal] = useState<'story' | 'benefits' | 'connect' | null>(null);
 
   const submitTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
   React.useEffect(() => {
+    // Respect prefers-reduced-motion
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (mediaQuery.matches && videoRef.current) {
+      videoRef.current.pause();
+    }
+
+    // Pause video when document is hidden to conserve mobile CPU/battery
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        videoRef.current?.pause();
+      } else if (!mediaQuery.matches) {
+        videoRef.current?.play().catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (submitTimerRef.current) {
         clearTimeout(submitTimerRef.current);
       }
@@ -57,11 +76,13 @@ export const AuraiHero: React.FC<AuraiHeroProps> = React.memo(({
       
       {/* Background Fullscreen Video */}
       <video
+        ref={videoRef}
         autoPlay
         loop
         muted
         playsInline
         preload="metadata"
+        aria-hidden="true"
         src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260618_174853_aac61aa2-0f3f-4cf1-bc78-7f657dd11164.mp4"
         className="absolute inset-0 w-full h-full object-cover [object-position:80%_center] md:[object-position:right_center] lg:[object-position:center_center]"
       />

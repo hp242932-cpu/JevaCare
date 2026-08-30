@@ -4,6 +4,7 @@ import App from './App.tsx';
 import { AuthProvider } from './context/AuthContext.tsx';
 import { ThemeProvider } from './context/ThemeContext.tsx';
 import { ToastProvider } from './context/ToastContext.tsx';
+import { LocationProvider } from './context/LocationContext.tsx';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -11,7 +12,9 @@ createRoot(document.getElementById('root')!).render(
     <AuthProvider>
       <ThemeProvider>
         <ToastProvider>
-          <App />
+          <LocationProvider>
+            <App />
+          </LocationProvider>
         </ToastProvider>
       </ThemeProvider>
     </AuthProvider>

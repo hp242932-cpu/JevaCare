@@ -351,8 +351,8 @@ export const accessibilityIntelligenceService = {
     const {
       bloodGroup: rawBloodGroup = 'O+',
       componentType = 'Packed Red Blood Cells (PRBC)',
-      userLat = 26.8688,
-      userLng = 80.9125,
+      userLat,
+      userLng,
       maxDistanceKm = 50,
       state
     } = params;
@@ -373,7 +373,10 @@ export const accessibilityIntelligenceService = {
 
     // Filter licensed blood bank inventory
     let filtered = officialBloodUnitsDirectory.map((record) => {
-      const distance = calculateDistanceKm(userLat, userLng, record.lat, record.lng);
+      const distance =
+        userLat !== undefined && userLng !== undefined
+          ? calculateDistanceKm(userLat, userLng, record.lat, record.lng)
+          : undefined;
       return {
         ...record,
         distanceKm: distance
@@ -424,8 +427,8 @@ export const accessibilityIntelligenceService = {
     profile: UserProfile,
     economicProfile: EconomicProfile | null,
     medicines: ActiveMedicine[] = [],
-    _userLat: number = 26.8688,
-    _userLng: number = 80.9125
+    _userLat?: number,
+    _userLng?: number
   ): AccessibilityScoreBreakdown {
     const econ = economicProfile || defaultInitialEconomicProfile;
 

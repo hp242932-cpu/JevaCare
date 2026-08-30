@@ -42,6 +42,7 @@ import { DailyWellnessWisdom } from './DailyWellnessWisdom';
 import { AIInsightsWidget } from './AIInsightsWidget';
 import { AccessibilityIntelligenceCard } from './AccessibilityIntelligenceCard';
 import { OfficialBloodStockCard } from './OfficialBloodStockCard';
+import { MedBuddyHomeCard } from '../medbuddy/MedBuddyHomeCard';
 
 interface DashboardProps {
   profile: UserProfile;
@@ -79,7 +80,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const safeAppointments = appointments || [];
   const safeVaultItems = vaultItems || [];
   const safeRiskAlerts = riskAlerts || [];
+  const safeMetricLogs = metricLogs || [];
   const upcomingApps = safeAppointments.filter((a) => a?.status === 'Upcoming');
+
+  const latestLog = safeMetricLogs[0];
+  const bpDisplay = latestLog?.systolicBp && latestLog?.diastolicBp
+    ? `${latestLog.systolicBp}/${latestLog.diastolicBp} mmHg`
+    : safeMetricLogs.length === 0 ? 'Not logged' : '118/76 mmHg';
+  const sugarDisplay = latestLog?.bloodSugar
+    ? `${latestLog.bloodSugar} mg/dL`
+    : safeMetricLogs.length === 0 ? 'Not logged' : '92 mg/dL';
 
   // Next prioritized action calculation
   const nextMedicine = safeActiveMedicines[0];
@@ -98,10 +108,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#5c5647] dark:text-[#c0b9ad]">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
                 <span className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400"></span>
-                Clinical Status: Stable & In Range
+                Clinical Status: {safeMetricLogs.length > 0 || safeActiveMedicines.length > 0 ? 'Stable & Monitored' : 'Profile Active'}
               </span>
               <span>•</span>
-              <span className="font-bold text-[#142b20] dark:text-[#f2f0e8]">ABHA: {profile.abhaId || '91-4829-1049-3821'}</span>
+              <span className="font-bold text-[#142b20] dark:text-[#f2f0e8]">
+                ABHA: {profile.abhaNumber || profile.abhaAddress || profile.abhaId || 'Not linked'}
+              </span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-serif-editorial font-bold text-[#142b20] dark:text-[#f2f0e8] tracking-tight">
@@ -109,24 +121,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </h1>
             
             <p className="text-sm sm:text-base text-[#5c5647] dark:text-[#c0b9ad] max-w-2xl leading-relaxed">
-              Your logged vitals remain in target ranges. You have {safeActiveMedicines.length} active {safeActiveMedicines.length === 1 ? 'medication' : 'medications'} scheduled today and {safeVaultItems.length} encrypted health records securely stored in your vault.
+              {safeActiveMedicines.length > 0 || safeVaultItems.length > 0
+                ? `You have ${safeActiveMedicines.length} active ${safeActiveMedicines.length === 1 ? 'medication' : 'medications'} scheduled today and ${safeVaultItems.length} encrypted health records securely stored in your vault.`
+                : 'Welcome to your private JeevanCare portal. Start by scanning a prescription, logging daily vitals, or uploading medical records to your secure vault.'}
             </p>
 
             {/* Live Vital Badges (Meaningful clinical parameters) */}
             <div className="flex flex-wrap items-center gap-2.5 pt-1 text-xs sm:text-sm">
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#142b20] dark:text-[#f2f0e8]">
                 <Activity className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                <span>BP: <strong>118/76 mmHg</strong></span>
+                <span>BP: <strong>{bpDisplay}</strong></span>
               </span>
 
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#142b20] dark:text-[#f2f0e8]">
                 <HeartPulse className="w-4 h-4 text-rose-600 dark:text-rose-400" />
-                <span>Sugar: <strong>92 mg/dL</strong></span>
+                <span>Sugar: <strong>{sugarDisplay}</strong></span>
               </span>
 
               <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#fcfaf6] dark:bg-[#1f3328] border border-[#e6dfd3] dark:border-[#2b4233] text-[#142b20] dark:text-[#f2f0e8]">
                 <CheckCircle2 className="w-4 h-4 text-blue-700 dark:text-blue-400" />
-                <span>Adherence: <strong>94% Streak</strong></span>
+                <span>Adherence: <strong>{safeActiveMedicines.length > 0 ? 'Active Course' : 'No active meds'}</strong></span>
               </span>
             </div>
           </div>
@@ -332,6 +346,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       )}
+
+      {/* =========================================================================
+          MEDBUDDY HEALTHCARE COMPANION SPOTLIGHT (Doorstep to OPD & Return)
+          ========================================================================= */}
+      <MedBuddyHomeCard
+        onOpenMedBuddy={() => setActiveTab('medbuddy')}
+        onOpenEmergency={onOpenEmergency}
+      />
 
       {/* =========================================================================
           HEALTHCARE ACCESSIBILITY & AFFORDABILITY INTELLIGENCE SPOTLIGHT

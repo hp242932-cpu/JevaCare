@@ -6,6 +6,7 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { OfflineNetworkBanner } from './components/common/OfflineNetworkBanner';
 import { JevanCareLoader } from './components/common/JevanCareLoader';
 import { SEOHeadManager } from './components/common/SEOHeadManager';
+import { LocationDebugPanel } from './components/common/LocationDebugPanel';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useAuth } from './context/AuthContext';
 
@@ -63,6 +64,9 @@ const HealthcareAccessibilityCenter = lazy(() =>
 );
 const EmergencyHubModal = lazy(() =>
   import('./components/emergency/EmergencyHubModal').then((m) => ({ default: m.EmergencyHubModal }))
+);
+const MedBuddyLandingView = lazy(() =>
+  import('./components/medbuddy/MedBuddyLandingView').then((m) => ({ default: m.MedBuddyLandingView }))
 );
 
 import {
@@ -406,9 +410,15 @@ export function App() {
                   setUserProfile((prev) => ({ ...prev, ...updated }))
                 }
               />
+            ) : activeRole === 'MedBuddy' ? (
+              <MedBuddyLandingView
+                userProfile={userProfile}
+                activeRole="medbuddy"
+                onOpenEmergency={handleOpenEmergency}
+              />
             ) : (
               <>
-                {(activeTab === 'dashboard' || activeTab === 'home' || !['scanner', 'medicine', 'care', 'doctors', 'map', 'rumor', 'assistant', 'ai', 'progress', 'lifestyle', 'vault', 'records', 'profile', 'blood-donation', 'admin', 'intelligence', 'accessibility', 'schemes'].includes(activeTab)) && (
+                {(activeTab === 'dashboard' || activeTab === 'home' || !['scanner', 'medicine', 'care', 'doctors', 'map', 'rumor', 'assistant', 'ai', 'progress', 'lifestyle', 'vault', 'records', 'profile', 'blood-donation', 'admin', 'intelligence', 'accessibility', 'schemes', 'medbuddy'].includes(activeTab)) && (
                   <Dashboard
                     profile={userProfile}
                     activeMedicines={activeMedicines}
@@ -421,6 +431,14 @@ export function App() {
                     setActiveTab={setActiveTab}
                     onOpenEmergency={handleOpenEmergency}
                     onMarkDoseTaken={handleMarkDoseTaken}
+                  />
+                )}
+
+                {activeTab === 'medbuddy' && (
+                  <MedBuddyLandingView
+                    userProfile={userProfile}
+                    activeRole="patient"
+                    onOpenEmergency={handleOpenEmergency}
                   />
                 )}
 
@@ -565,6 +583,9 @@ export function App() {
         isSyncing={isSyncing}
         lastSyncedAt={lastSyncedAt}
       />
+
+      {/* Real-time GPS Engine Diagnostic Panel */}
+      <LocationDebugPanel />
 
     </div>
   );

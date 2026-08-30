@@ -21,7 +21,8 @@ import {
   Moon,
   Laptop,
   FlaskConical,
-  X
+  X,
+  HeartHandshake
 } from 'lucide-react';
 import { UserProfile, UserRole, AppNotification, RoleType } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -236,6 +237,17 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                     <Stethoscope className="w-3.5 h-3.5" /> Doctor
                   </span>
                   {currentRole === 'Doctor' && <CheckCircle2 className="w-3.5 h-3.5 text-[#2b503b]" />}
+                </button>
+                <button
+                  onClick={() => handleRoleChange('MedBuddy')}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#e8eee5] dark:hover:bg-[#23382c] ${
+                    currentRole === 'MedBuddy' ? 'text-[#1b3b2b] font-bold dark:text-[#a3d4b6] bg-[#e8eee5]/60' : 'text-[#5c5647] dark:text-[#d5cfc2]'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <HeartHandshake className="w-3.5 h-3.5" /> MedBuddy Companion
+                  </span>
+                  {currentRole === 'MedBuddy' && <CheckCircle2 className="w-3.5 h-3.5 text-[#2b503b]" />}
                 </button>
               </div>
             )}

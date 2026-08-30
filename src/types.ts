@@ -1,5 +1,5 @@
-export type UserRole = 'patient' | 'doctor' | 'admin';
-export type RoleType = 'Patient' | 'Doctor';
+export type UserRole = 'patient' | 'doctor' | 'admin' | 'medbuddy';
+export type RoleType = 'Patient' | 'Doctor' | 'MedBuddy';
 export type AuthMode = 'ACCOUNT' | 'DEMO' | 'LOADING' | 'SIGNED_OUT';
 
 export interface SavedGoogleAccount {
@@ -715,6 +715,214 @@ export interface HealthcarePathwaySelection {
   targetConditionOrMedicine?: string;
   preferredFacilityType?: 'government' | 'janaushadhi' | 'private' | 'any';
 }
+
+// ============================================================================
+// MEDBUDDY HUMAN HEALTHCARE COMPANION DOMAIN MODELS
+// ============================================================================
+
+export type MedBuddyBookingStatus =
+  | 'REQUESTED'
+  | 'SEARCHING_FOR_BUDDY'
+  | 'BUDDY_ASSIGNED'
+  | 'BUDDY_EN_ROUTE'
+  | 'BUDDY_ARRIVED'
+  | 'PICKUP_CONFIRMED'
+  | 'TRAVELLING_TO_HOSPITAL'
+  | 'ARRIVED_AT_HOSPITAL'
+  | 'REGISTRATION_ASSISTANCE'
+  | 'WAITING_WITH_PATIENT'
+  | 'DISCHARGE_ASSISTANCE'
+  | 'RETURN_TRIP'
+  | 'DROPPED_HOME'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type MedBuddyVerificationStatus = 'pending' | 'verified' | 'suspended';
+
+export type MedBuddyAvailability = 'available' | 'busy' | 'offline' | 'suspended';
+
+export type CabBookingState =
+  | 'FARE_ESTIMATED'
+  | 'CAB_REQUESTED'
+  | 'CAB_CONFIRMED'
+  | 'DRIVER_ASSIGNED'
+  | 'DRIVER_ARRIVING'
+  | 'RIDE_STARTED'
+  | 'RIDE_COMPLETED'
+  | 'CAB_CANCELLED';
+
+export interface MedBuddyProfile {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  photo: string;
+  gender: 'Female' | 'Male' | 'Other';
+  age: number;
+  rating: number;
+  reviewCount: number;
+  completedTrips: number;
+  verificationStatus: MedBuddyVerificationStatus;
+  backgroundVerified: boolean;
+  trainingCompleted: boolean;
+  languages: string[];
+  serviceArea: string;
+  currentAvailability: MedBuddyAvailability;
+  currentCoordinates?: { lat: number; lng: number };
+  bio?: string;
+  experienceYears?: number;
+  activeBookingId?: string | null;
+  joinedDate: string;
+}
+
+export interface MedBuddyPricingConfig {
+  baseServiceFee: number; // e.g. 299 for initial 1 hour companion
+  hourlyRate: number; // e.g. 149/hr
+  additionalHourRate: number; // e.g. 149/hr
+  nightSurcharge: number; // e.g. 99 (8 PM - 6 AM)
+  weekendSurcharge: number; // e.g. 49
+  platformFee: number; // e.g. 39
+  cancellationFee: number; // e.g. 99
+  taxRate: number; // e.g. 0.05 (5% GST)
+  includedWaitingMinutes: number; // e.g. 30
+  extraWaitingPerMinuteRate: number; // e.g. 2
+}
+
+export interface TransportPricingConfig {
+  baseFare: number; // e.g. 50
+  perKm: number; // e.g. 14
+  perMinute: number; // e.g. 2
+  bookingFee: number; // e.g. 20
+  taxPercent: number; // e.g. 5
+  surgeMultiplier: number; // default 1.0
+}
+
+export interface PriceSnapshot {
+  pricingConfigVersion: string;
+  baseServiceFee: number;
+  hourlyRate: number;
+  estimatedCompanionHours: number;
+  companionFee: number;
+  platformFee: number;
+  taxRate: number;
+  taxAmount: number;
+  // Outbound Transport
+  outboundDistanceKm: number;
+  outboundDurationMinutes: number;
+  outboundTransportMin: number;
+  outboundTransportMax: number;
+  // Return Transport
+  returnRequired: boolean;
+  returnDistanceKm: number;
+  returnDurationMinutes: number;
+  returnTransportMin: number;
+  returnTransportMax: number;
+  // Aggregates
+  totalTransportMin: number;
+  totalTransportMax: number;
+  estimatedTotalMin: number;
+  estimatedTotalMax: number;
+  currency: string;
+  cancellationPolicy: {
+    freeCancellationMinutes: number;
+    fee: number;
+    description: string;
+  };
+}
+
+export interface MedBuddyBookingTask {
+  id: string;
+  title: string;
+  category: 'pickup' | 'hospital' | 'admin' | 'return';
+  completed: boolean;
+  completedAt?: string;
+  completedBy?: string;
+}
+
+export interface MedBuddyBookingEvent {
+  id: string;
+  bookingId: string;
+  eventType: string;
+  actorId: string;
+  actorRole: 'patient' | 'buddy' | 'admin' | 'system';
+  timestamp: string;
+  description: string;
+  metadata?: Record<string, any>;
+}
+
+export interface MedBuddyBooking {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientPhone: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  isForSelf: boolean;
+  patientRelationship?: string;
+  patientAge?: number;
+  
+  // Need & Screening
+  reasonCategory: string; // 'Hospital visit' | 'Doctor appointment' | 'Diagnostic test' | 'Follow-up visit' | 'Discharge assistance' | 'Other'
+  customReason?: string;
+  emergencyScreeningCleared: boolean;
+  
+  // Locations
+  pickupAddress: string;
+  pickupCoordinates: { lat: number; lng: number };
+  destinationPlaceId?: string;
+  destinationName: string;
+  destinationAddress: string;
+  destinationCoordinates: { lat: number; lng: number };
+  destinationPhone?: string;
+  destinationMapsUrl?: string;
+  
+  // Timing & Duration
+  scheduledAt: string;
+  isAsap: boolean;
+  estimatedArrivalWindow?: string;
+  expectedHospitalDuration: string; // '<1 hour' | '1–2 hours' | '2–4 hours' | '4–6 hours' | 'Not sure'
+  estimatedTotalDurationMinutes: number;
+  
+  // Return & Services
+  returnRequired: boolean;
+  returnOption: 'after_appointment' | 'specific_time' | 'after_discharge' | 'decide_later';
+  requestedServices: string[];
+  mobilityRequirement: 'independent' | 'walking_assistance' | 'wheelchair' | 'walking_stick' | 'extra_assistance';
+  
+  // Pricing
+  priceSnapshot: PriceSnapshot;
+  
+  // Status & Assignment
+  status: MedBuddyBookingStatus;
+  assignedBuddyId?: string | null;
+  assignedBuddy?: MedBuddyProfile | null;
+  pickupPin: string; // 4-digit verification PIN
+  
+  // Tasks & Progress
+  tasks: MedBuddyBookingTask[];
+  events: MedBuddyBookingEvent[];
+  
+  // Transport Sub-state
+  cabStatus: CabBookingState;
+  cabProviderName?: string;
+  
+  // Payment
+  paymentStatus: 'pending' | 'authorized' | 'paid' | 'failed' | 'refunded' | 'cash' | 'test_mode';
+  paymentId?: string;
+  
+  // Closure
+  cancellationReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: 'patient' | 'buddy' | 'admin' | 'system';
+  rating?: number;
+  reviewFeedback?: string;
+  ratedAt?: string;
+  
+  createdAt: string;
+  updatedAt: string;
+  isDemoData?: boolean;
+}
+
 
 
 

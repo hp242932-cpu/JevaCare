@@ -52,13 +52,14 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = React.memo(({
       label: 'Care',
       icon: HeartPulse,
       defaultTab: 'medicine',
-      matchingTabs: ['medicine', 'doctors', 'map', 'blood-donation', 'care', 'intelligence', 'accessibility', 'schemes'],
+      matchingTabs: ['medicine', 'doctors', 'map', 'blood-donation', 'medbuddy', 'care', 'intelligence', 'accessibility', 'schemes'],
       subTabs: [
         { id: 'intelligence', label: 'Intelligence & Schemes', icon: Sparkles },
+        { id: 'medbuddy', label: 'MedBuddy Companion', icon: HeartHandshake },
         { id: 'medicine', label: 'Medicines & Schedule', icon: Pill },
         { id: 'doctors', label: 'Consult Doctors', icon: Stethoscope },
         { id: 'map', label: 'Nearby Healthcare', icon: MapPin },
-        { id: 'blood-donation', label: 'Blood Network', icon: HeartHandshake },
+        { id: 'blood-donation', label: 'Blood Network', icon: Heart },
       ]
     },
     {

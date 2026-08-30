@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   APIProvider,
-  Map,
+  Map as GoogleMap,
   AdvancedMarker,
   Pin,
   InfoWindow,
@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { JevanCareLoader } from '../common/JevanCareLoader';
 import { useToast } from '../../context/ToastContext';
+import { useUserLocation } from '../../context/LocationContext';
+import { calculateHaversineDistanceKm } from '../../services/locationService';
 
 // API Key configuration
 const API_KEY =
@@ -84,21 +86,6 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// Calculate precise Haversine distance in kilometers
-function calculateHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 10) / 10;
-}
-
 // Map color/style helper by place category
 function getCategoryTheme(type: PlaceResult['type']) {
   switch (type) {
@@ -150,10 +137,116 @@ function getCategoryTheme(type: PlaceResult['type']) {
   }
 }
 
+// Robust classification helper that avoids false-positive discarding
+function classifyPlaceType(types: string[] = [], name: string = '', activeCategory?: string): PlaceResult['type'] {
+  const lowerName = name.toLowerCase();
+  const lowerTypes = types.map((t) => (typeof t === 'string' ? t.toLowerCase() : ''));
+
+  // 1. Diagnostic Lab
+  if (
+    lowerTypes.includes('medical_lab') ||
+    lowerTypes.includes('medical_laboratory') ||
+    lowerName.includes('lab') ||
+    lowerName.includes('diagnostic') ||
+    lowerName.includes('pathology') ||
+    lowerName.includes('scan') ||
+    lowerName.includes('imaging') ||
+    lowerName.includes('x-ray') ||
+    lowerName.includes('xray') ||
+    lowerName.includes('mri') ||
+    lowerName.includes('radiology') ||
+    lowerName.includes('ultrasound')
+  ) {
+    return 'Diagnostic Lab';
+  }
+
+  // 2. Pharmacy / Chemist / Drugstore
+  if (
+    lowerTypes.includes('pharmacy') ||
+    lowerTypes.includes('drugstore') ||
+    lowerName.includes('pharmacy') ||
+    lowerName.includes('chemist') ||
+    lowerName.includes('medical store') ||
+    lowerName.includes('medicos') ||
+    lowerName.includes('druggist') ||
+    lowerName.includes('dawa') ||
+    lowerName.includes('apothecary') ||
+    lowerName.includes('medicals')
+  ) {
+    return 'Pharmacy';
+  }
+
+  // 3. Hospital
+  if (
+    lowerTypes.includes('hospital') ||
+    lowerName.includes('hospital') ||
+    lowerName.includes('trauma') ||
+    lowerName.includes('super speciality') ||
+    lowerName.includes('superspeciality') ||
+    lowerName.includes('nursing home') ||
+    lowerName.includes('institute of medical') ||
+    lowerName.includes('emergency care') ||
+    lowerName.includes('medical college') ||
+    lowerName.includes('infirmary')
+  ) {
+    return 'Hospital';
+  }
+
+  // 4. Clinic / Doctor
+  if (
+    lowerTypes.includes('doctor') ||
+    lowerTypes.includes('physiotherapist') ||
+    lowerTypes.includes('dentist') ||
+    lowerName.includes('clinic') ||
+    lowerName.includes('polyclinic') ||
+    lowerName.includes('dispensary') ||
+    lowerName.includes('dr.') ||
+    lowerName.includes('doctor') ||
+    lowerName.includes('consultant') ||
+    lowerName.includes('care center') ||
+    lowerName.includes('health center') ||
+    lowerName.includes('dental')
+  ) {
+    return 'Clinic';
+  }
+
+  // Contextual fallback based on active category
+  if (activeCategory === 'Hospitals') return 'Hospital';
+  if (activeCategory === 'Pharmacies') return 'Pharmacy';
+  if (activeCategory === 'Clinics') return 'Clinic';
+  if (activeCategory === 'Diagnostic Labs') return 'Diagnostic Lab';
+
+  return 'Healthcare';
+}
+
+// Visual GPS Accuracy Circle Renderer using Google Maps JS Circle
+function AccuracyCircle({ center, radiusMeters }: { center: { lat: number; lng: number }; radiusMeters: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !(window as any).google?.maps?.Circle) return;
+    const circle = new (window as any).google.maps.Circle({
+      map,
+      center,
+      radius: Math.max(10, Math.min(radiusMeters, 15000)),
+      fillColor: '#3b82f6',
+      fillOpacity: 0.12,
+      strokeColor: '#2563eb',
+      strokeOpacity: 0.45,
+      strokeWeight: 1.5,
+      clickable: false,
+    });
+    return () => {
+      circle.setMap(null);
+    };
+  }, [map, center.lat, center.lng, radiusMeters]);
+  return null;
+}
+
 // Inner Map & Places Search Controller
 function PlacesMapContent({
   center,
   userLocation,
+  accuracy,
   locationLabel,
   category,
   radiusKm,
@@ -166,6 +259,7 @@ function PlacesMapContent({
 }: {
   center: { lat: number; lng: number };
   userLocation: { lat: number; lng: number } | null;
+  accuracy?: number | null;
   locationLabel: string;
   category: string;
   radiusKm: number;
@@ -200,7 +294,7 @@ function PlacesMapContent({
     }
   }, [map, center.lat, center.lng, radiusKm]);
 
-  // Perform Google Places API Search
+  // Perform Google Places API Multi-Category Search
   const performSearch = useCallback(async () => {
     if (!center) return;
 
@@ -217,227 +311,280 @@ function PlacesMapContent({
     onPlacesFetchedRef.current([], true, null);
 
     const radiusMeters = radiusKm * 1000;
-    const originLocation = userLocation || center;
+    const placesMap = new Map<string, PlaceResult>();
+    let rawPlacesTotal = 0;
+    let normalizedTotal = 0;
+    let capturedApiError: string | null = null;
+    let responseStatus: string | number = 200;
 
-    let queryText = 'hospital pharmacy clinic healthcare';
-    if (category === 'Hospitals') queryText = 'hospital emergency care medical center';
-    else if (category === 'Pharmacies') queryText = 'pharmacy medical shop chemist drug store';
-    else if (category === 'Clinics') queryText = 'doctor clinic polyclinic medical center';
-    else if (category === 'Diagnostic Labs') queryText = 'diagnostic center pathology lab scan test center';
+    // Helper to normalize and add/merge discovered place into unified map
+    const addOrMergePlace = (
+      id: string,
+      name: string,
+      address: string,
+      pLat: number,
+      pLng: number,
+      types: string[] = [],
+      rating?: number,
+      userRatingCount?: number,
+      phone?: string,
+      openNow?: boolean,
+      googleMapsUri?: string
+    ) => {
+      if (!name || isNaN(pLat) || isNaN(pLng)) return;
+      normalizedTotal++;
 
-    const results: PlaceResult[] = [];
+      const dist = calculateHaversineDistanceKm(center.lat, center.lng, pLat, pLng);
+      // Radius check with a 5% margin to prevent hard cutoff on boundary facilities
+      if (dist > radiusKm * 1.05) return;
 
-    // Method 1: Try Places API (New) Place.searchByText if available
-    if (placesLib?.Place?.searchByText) {
-      try {
-        const response = await placesLib.Place.searchByText({
-          textQuery: queryText,
-          locationBias: { center, radius: radiusMeters },
-          maxResultCount: 20,
-          fields: [
-            'id',
-            'displayName',
-            'formattedAddress',
-            'location',
-            'rating',
-            'userRatingCount',
-            'nationalPhoneNumber',
-            'internationalPhoneNumber',
-            'regularOpeningHours',
-            'types',
-            'googleMapsURI'
-          ]
-        });
+      const placeType = classifyPlaceType(types, name);
 
-        if (currentReqId !== activeReqRef.current) return; // Stale request, ignore
-
-        if (response?.places && response.places.length > 0) {
-          for (const p of response.places) {
-            const rawLat = p.location?.lat;
-            const rawLng = p.location?.lng;
-            const pLat = typeof rawLat === 'function' ? (rawLat as () => number)() : typeof rawLat === 'number' ? rawLat : undefined;
-            const pLng = typeof rawLng === 'function' ? (rawLng as () => number)() : typeof rawLng === 'number' ? rawLng : undefined;
-            if (pLat === undefined || pLng === undefined) continue;
-
-            const name = typeof p.displayName === 'string' ? p.displayName : ((p.displayName as any)?.text || 'Medical Facility');
-            const dist = calculateHaversineDistanceKm(originLocation.lat, originLocation.lng, pLat, pLng);
-
-            let placeType: PlaceResult['type'] = 'Healthcare';
-            const typesArr = p.types || [];
-            if (typesArr.includes('hospital') || name.toLowerCase().includes('hospital')) {
-              placeType = 'Hospital';
-            } else if (typesArr.includes('pharmacy') || name.toLowerCase().includes('pharmacy') || name.toLowerCase().includes('chemist') || name.toLowerCase().includes('med')) {
-              placeType = 'Pharmacy';
-            } else if (typesArr.includes('doctor') || name.toLowerCase().includes('clinic')) {
-              placeType = 'Clinic';
-            } else if (name.toLowerCase().includes('lab') || name.toLowerCase().includes('diagnostic') || name.toLowerCase().includes('pathology')) {
-              placeType = 'Diagnostic Lab';
-            }
-
-            results.push({
-              id: p.id || `p_${pLat.toFixed(4)}_${pLng.toFixed(4)}`,
-              name,
-              address: p.formattedAddress || 'Address unavailable',
-              lat: pLat,
-              lng: pLng,
-              type: placeType,
-              distanceKm: dist,
-              rating: p.rating || 4.2,
-              userRatingCount: p.userRatingCount || 0,
-              phone: p.nationalPhoneNumber || p.internationalPhoneNumber || '',
-              openNow: (p.regularOpeningHours as any)?.openNow ?? true,
-              googleMapsUri: p.googleMapsURI || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${p.id}`
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('Places API searchByText error:', err);
+      // Verify category filter match
+      if (category !== 'All') {
+        if (category === 'Hospitals' && placeType !== 'Hospital') return;
+        if (category === 'Pharmacies' && placeType !== 'Pharmacy') return;
+        if (category === 'Clinics' && placeType !== 'Clinic') return;
+        if (category === 'Diagnostic Labs' && placeType !== 'Diagnostic Lab') return;
       }
-    }
 
-    // Method 2: Try Places API (New) Place.searchNearby if searchByText returned 0 results
-    if (results.length === 0 && placesLib?.Place?.searchNearby) {
-      try {
-        const nearbyResponse = await placesLib.Place.searchNearby({
-          locationRestriction: {
-            center: { lat: center.lat, lng: center.lng },
-            radius: radiusMeters
-          },
-          maxResultCount: 20,
-          fields: [
-            'id',
-            'displayName',
-            'formattedAddress',
-            'location',
-            'rating',
-            'userRatingCount',
-            'nationalPhoneNumber',
-            'internationalPhoneNumber',
-            'regularOpeningHours',
-            'types',
-            'googleMapsURI'
-          ]
-        });
+      const placeKey = id || `${pLat.toFixed(5)}_${pLng.toFixed(5)}`;
+      const existing = placesMap.get(placeKey);
 
-        if (currentReqId !== activeReqRef.current) return;
-
-        if (nearbyResponse?.places && nearbyResponse.places.length > 0) {
-          for (const p of nearbyResponse.places) {
-            const rawLat = p.location?.lat;
-            const rawLng = p.location?.lng;
-            const pLat = typeof rawLat === 'function' ? (rawLat as () => number)() : typeof rawLat === 'number' ? rawLat : undefined;
-            const pLng = typeof rawLng === 'function' ? (rawLng as () => number)() : typeof rawLng === 'number' ? rawLng : undefined;
-            if (pLat === undefined || pLng === undefined) continue;
-
-            const name = typeof p.displayName === 'string' ? p.displayName : ((p.displayName as any)?.text || 'Medical Facility');
-            const dist = calculateHaversineDistanceKm(originLocation.lat, originLocation.lng, pLat, pLng);
-
-            let placeType: PlaceResult['type'] = 'Healthcare';
-            const typesArr = p.types || [];
-            if (typesArr.includes('hospital') || name.toLowerCase().includes('hospital')) {
-              placeType = 'Hospital';
-            } else if (typesArr.includes('pharmacy') || name.toLowerCase().includes('pharmacy') || name.toLowerCase().includes('chemist') || name.toLowerCase().includes('med')) {
-              placeType = 'Pharmacy';
-            } else if (typesArr.includes('doctor') || name.toLowerCase().includes('clinic')) {
-              placeType = 'Clinic';
-            } else if (name.toLowerCase().includes('lab') || name.toLowerCase().includes('diagnostic') || name.toLowerCase().includes('pathology')) {
-              placeType = 'Diagnostic Lab';
-            }
-
-            results.push({
-              id: p.id || `p_${pLat.toFixed(4)}_${pLng.toFixed(4)}`,
-              name,
-              address: p.formattedAddress || 'Address unavailable',
-              lat: pLat,
-              lng: pLng,
-              type: placeType,
-              distanceKm: dist,
-              rating: p.rating || 4.2,
-              userRatingCount: p.userRatingCount || 0,
-              phone: p.nationalPhoneNumber || p.internationalPhoneNumber || '',
-              openNow: (p.regularOpeningHours as any)?.openNow ?? true,
-              googleMapsUri: p.googleMapsURI || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${p.id}`
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('Places API searchNearby error:', err);
-      }
-    }
-
-    // Method 3: Fallback localized facility generator around active search coordinates
-    if (results.length === 0) {
-      if (currentReqId !== activeReqRef.current) return;
-
-      const mockFacilities: { idSuffix: string; name: string; type: PlaceResult['type']; offsetLat: number; offsetLng: number; rating: number; reviews: number; phone: string; open: boolean }[] = [
-        { idSuffix: 'hosp1', name: 'City Central Hospital & 24/7 Emergency Center', type: 'Hospital', offsetLat: 0.004, offsetLng: 0.003, rating: 4.8, reviews: 342, phone: '+1 800-555-0199', open: true },
-        { idSuffix: 'pharm1', name: 'Apothecary 24x7 Chemist & Drug Store', type: 'Pharmacy', offsetLat: -0.003, offsetLng: 0.002, rating: 4.6, reviews: 189, phone: '+1 800-555-0144', open: true },
-        { idSuffix: 'clin1', name: 'Metro Family Healthcare & Specialist Clinic', type: 'Clinic', offsetLat: 0.002, offsetLng: -0.005, rating: 4.5, reviews: 98, phone: '+1 800-555-0182', open: true },
-        { idSuffix: 'lab1', name: 'Precision Diagnostic & Pathology Scan Lab', type: 'Diagnostic Lab', offsetLat: -0.004, offsetLng: -0.004, rating: 4.7, reviews: 156, phone: '+1 800-555-0123', open: true },
-        { idSuffix: 'hosp2', name: 'St. Jude Specialty Hospital & Trauma ER', type: 'Hospital', offsetLat: 0.007, offsetLng: -0.003, rating: 4.9, reviews: 520, phone: '+1 800-555-0111', open: true },
-        { idSuffix: 'pharm2', name: 'Wellness Express Pharmacy & Healthcare', type: 'Pharmacy', offsetLat: 0.001, offsetLng: 0.006, rating: 4.4, reviews: 76, phone: '+1 800-555-0167', open: true }
-      ];
-
-      for (const item of mockFacilities) {
-        if (
-          category !== 'All' &&
-          category !== item.type + 's' &&
-          !(category === 'Pharmacies' && item.type === 'Pharmacy') &&
-          !(category === 'Clinics' && item.type === 'Clinic') &&
-          !(category === 'Diagnostic Labs' && item.type === 'Diagnostic Lab') &&
-          !(category === 'Hospitals' && item.type === 'Hospital')
-        ) {
-          continue;
-        }
-
-        const fLat = center.lat + item.offsetLat;
-        const fLng = center.lng + item.offsetLng;
-        const dist = calculateHaversineDistanceKm(originLocation.lat, originLocation.lng, fLat, fLng);
-
-        results.push({
-          id: `facility_${item.idSuffix}_${center.lat.toFixed(2)}_${center.lng.toFixed(2)}`,
-          name: item.name,
-          address: `Near ${locationLabel.split('(')[0].trim()}, District Center`,
-          lat: fLat,
-          lng: fLng,
-          type: item.type,
+      if (!existing) {
+        placesMap.set(placeKey, {
+          id: placeKey,
+          name,
+          address: address || 'Address unavailable',
+          lat: pLat,
+          lng: pLng,
+          type: placeType,
           distanceKm: dist,
-          rating: item.rating,
-          userRatingCount: item.reviews,
-          phone: item.phone,
-          openNow: item.open,
-          googleMapsUri: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.name)}`
+          rating: rating && rating > 0 ? rating : 4.2,
+          userRatingCount: userRatingCount || 0,
+          phone: phone || '',
+          openNow: openNow ?? true,
+          googleMapsUri:
+            googleMapsUri ||
+            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${placeKey}`
         });
+      } else {
+        // Upgrade existing place with more complete fields
+        if (!existing.phone && phone) existing.phone = phone;
+        if (rating && rating > 0 && (!existing.rating || existing.rating === 4.2)) existing.rating = rating;
+        if (userRatingCount && userRatingCount > existing.userRatingCount) existing.userRatingCount = userRatingCount;
+        if (openNow !== undefined) existing.openNow = openNow;
+      }
+    };
+
+    // -------------------------------------------------------------
+    // Target Categories & Types (Google Places API New Table A)
+    // -------------------------------------------------------------
+    const targetedTypes: string[] = [];
+    const targetedTextQueries: string[] = [];
+
+    if (category === 'All') {
+      targetedTypes.push('hospital', 'pharmacy', 'drugstore', 'doctor', 'medical_lab');
+      targetedTextQueries.push(
+        'hospital',
+        'pharmacy chemist',
+        'clinic doctor',
+        'diagnostic center pathology lab'
+      );
+    } else if (category === 'Hospitals') {
+      targetedTypes.push('hospital');
+      targetedTextQueries.push('hospital', 'emergency care hospital', 'medical center');
+    } else if (category === 'Pharmacies') {
+      targetedTypes.push('pharmacy', 'drugstore');
+      targetedTextQueries.push('pharmacy', 'chemist shop', 'medical store');
+    } else if (category === 'Clinics') {
+      targetedTypes.push('doctor', 'physiotherapist', 'dentist');
+      targetedTextQueries.push('doctor clinic', 'polyclinic', 'health center');
+    } else if (category === 'Diagnostic Labs') {
+      targetedTypes.push('medical_lab');
+      targetedTextQueries.push('diagnostic center', 'pathology lab', 'radiology scan center');
+    }
+
+    const searchPromises: Promise<void>[] = [];
+
+    // 1. Client-Side Places API (New) via useMapsLibrary('places')
+    if (placesLib?.Place?.searchNearby && targetedTypes.length > 0) {
+      for (const type of targetedTypes) {
+        searchPromises.push(
+          placesLib.Place.searchNearby({
+            locationRestriction: {
+              center: { lat: center.lat, lng: center.lng },
+              radius: radiusMeters
+            },
+            includedTypes: [type],
+            maxResultCount: 20,
+            fields: [
+              'id',
+              'displayName',
+              'formattedAddress',
+              'location',
+              'rating',
+              'userRatingCount',
+              'nationalPhoneNumber',
+              'internationalPhoneNumber',
+              'regularOpeningHours',
+              'types',
+              'googleMapsURI'
+            ]
+          })
+            .then((resp) => {
+              if (resp?.places) {
+                rawPlacesTotal += resp.places.length;
+                for (const p of resp.places) {
+                  const rawLat = p.location?.lat;
+                  const rawLng = p.location?.lng;
+                  const pLat = typeof rawLat === 'function' ? (rawLat as () => number)() : typeof rawLat === 'number' ? rawLat : undefined;
+                  const pLng = typeof rawLng === 'function' ? (rawLng as () => number)() : typeof rawLng === 'number' ? rawLng : undefined;
+                  if (pLat === undefined || pLng === undefined) continue;
+
+                  const name = typeof p.displayName === 'string' ? p.displayName : ((p.displayName as any)?.text || 'Medical Facility');
+                  addOrMergePlace(
+                    p.id || '',
+                    name,
+                    p.formattedAddress || '',
+                    pLat,
+                    pLng,
+                    p.types || [type],
+                    p.rating,
+                    p.userRatingCount,
+                    p.nationalPhoneNumber || p.internationalPhoneNumber,
+                    (p.regularOpeningHours as any)?.openNow,
+                    p.googleMapsURI
+                  );
+                }
+              }
+            })
+            .catch((err: any) => {
+              const msg = err?.message || String(err);
+              responseStatus = err?.code || err?.status || 'ERROR';
+              if (msg.includes('disabled') || msg.includes('not been used') || msg.includes('403') || msg.includes('LegacyApiNotActivated')) {
+                capturedApiError = msg;
+              }
+            })
+        );
       }
     }
+
+    // 2. Server-side proxy backup to guarantee reliable REST access and capture raw error codes
+    searchPromises.push(
+      (async () => {
+        try {
+          const res = await fetch('/api/places/search-nearby', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              latitude: center.lat,
+              longitude: center.lng,
+              radiusMeters,
+              includedTypes: targetedTypes,
+              maxResultCount: 20
+            })
+          });
+          responseStatus = res.status;
+          const data = await res.json();
+          if (data.success && Array.isArray(data.places)) {
+            rawPlacesTotal += data.places.length;
+            for (const p of data.places) {
+              const pLat = p.location?.latitude ?? p.location?.lat;
+              const pLng = p.location?.longitude ?? p.location?.lng;
+              if (pLat === undefined || pLng === undefined) continue;
+
+              const name = typeof p.displayName === 'string' ? p.displayName : (p.displayName?.text || 'Medical Facility');
+              addOrMergePlace(
+                p.id || '',
+                name,
+                p.formattedAddress || '',
+                Number(pLat),
+                Number(pLng),
+                p.types || [],
+                p.rating,
+                p.userRatingCount,
+                p.nationalPhoneNumber || p.internationalPhoneNumber,
+                p.regularOpeningHours?.openNow,
+                p.googleMapsUri
+              );
+            }
+          } else if (data.error) {
+            const errCode = data.error.code || res.status;
+            const errMsg = data.error.message || 'Google Places API request failed.';
+            capturedApiError = `[Google Places API Error ${errCode}]: ${errMsg}`;
+          }
+        } catch (e: any) {
+          // Network or server unreachable
+        }
+      })()
+    );
+
+    // Wait for all queries to settle concurrently
+    await Promise.allSettled(searchPromises);
 
     if (currentReqId !== activeReqRef.current) return;
 
-    // Filter by keyword if user typed in local filter box
-    let filtered = results;
+    let finalResults: PlaceResult[] = Array.from(placesMap.values());
+
+    // Filter by user search bar keyword if entered
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q)
+      finalResults = finalResults.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.address.toLowerCase().includes(q) ||
+          p.type.toLowerCase().includes(q)
       );
     }
 
-    // Sort results
+    // Sort results accurately
     if (sortBy === 'nearest') {
-      filtered.sort((a, b) => a.distanceKm - b.distanceKm);
+      finalResults.sort((a, b) => a.distanceKm - b.distanceKm);
     } else if (sortBy === 'rating') {
-      filtered.sort((a, b) => b.rating - a.rating);
+      finalResults.sort((a, b) => b.rating - a.rating || a.distanceKm - b.distanceKm);
     } else if (sortBy === 'reviews') {
-      filtered.sort((a, b) => b.userRatingCount - a.userRatingCount);
+      finalResults.sort((a, b) => b.userRatingCount - a.userRatingCount || a.distanceKm - b.distanceKm);
     }
 
-    setPlaces(filtered);
+    // DEVELOPMENT DIAGNOSTICS LOGGING
+    console.log('[NearbyHealthcare]');
+    console.log('Search center:');
+    console.log('latitude', center.lat);
+    console.log('longitude', center.lng);
+    console.log('Radius:');
+    console.log('selected radius', radiusMeters, 'meters');
+    console.log('Selected category:');
+    console.log(category);
+    console.log('Google request:');
+    console.log('endpoint', '/v1/places:searchNearby');
+    console.log('includedTypes', targetedTypes);
+    console.log('rankPreference', 'DISTANCE');
+    console.log('maxResultCount', 20);
+    console.log('Google response status:');
+    console.log('HTTP status', responseStatus);
+    console.log('Raw places:');
+    console.log(rawPlacesTotal);
+    console.log('After normalization:');
+    console.log(normalizedTotal);
+    console.log('After deduplication:');
+    console.log(placesMap.size);
+    console.log('After distance calculation:');
+    console.log(placesMap.size);
+    console.log('After category filtering:');
+    console.log(finalResults.length);
+    console.log('Final displayed:');
+    console.log(finalResults.length);
+
+    setPlaces(finalResults);
     onPlacesFetchedRef.current(
-      filtered,
+      finalResults,
       false,
-      filtered.length === 0 ? 'No medical facilities found matching criteria. Try expanding search radius.' : null
+      capturedApiError || (finalResults.length === 0
+        ? `No healthcare facilities found within ${radiusKm} km. Try expanding the search radius or searching another area.`
+        : null)
     );
-  }, [center.lat, center.lng, category, radiusKm, searchQuery, sortBy, userLocation?.lat, userLocation?.lng, placesLib, locationLabel, refreshToken]);
+  }, [center.lat, center.lng, category, radiusKm, searchQuery, sortBy, placesLib, map, refreshToken]);
 
   useEffect(() => {
     performSearch();
@@ -445,16 +592,21 @@ function PlacesMapContent({
 
   return (
     <>
-      {/* User GPS Location Marker */}
+      {/* User GPS Location Marker & Accuracy Boundary */}
       {userLocation && (
-        <AdvancedMarker position={userLocation} title="Your Current GPS Location" zIndex={100}>
-          <div className="relative flex items-center justify-center">
-            <div className="absolute w-8 h-8 rounded-full bg-blue-500/30 animate-ping"></div>
-            <div className="w-5 h-5 rounded-full bg-blue-600 border-2 border-white shadow-md flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-white"></div>
+        <>
+          <AdvancedMarker position={userLocation} title="Your Current GPS Location" zIndex={100}>
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-8 h-8 rounded-full bg-blue-500/30 animate-ping"></div>
+              <div className="w-5 h-5 rounded-full bg-blue-600 border-2 border-white shadow-md flex items-center justify-center">
+                <div className="w-2 h-2 rounded-full bg-white"></div>
+              </div>
             </div>
-          </div>
-        </AdvancedMarker>
+          </AdvancedMarker>
+          {accuracy && accuracy > 0 && (
+            <AccuracyCircle center={userLocation} radiusMeters={accuracy} />
+          )}
+        </>
       )}
 
       {/* Place Pins */}
@@ -538,18 +690,39 @@ function PlacesMapContent({
 
 export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpenEmergency }) => {
   const { showToast } = useToast();
-  // Coordinates & Location state
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number }>(DEFAULT_CENTER);
-  const [locationLabel, setLocationLabel] = useState<string>('Default Location (New Delhi)');
 
-  // Geolocation status & locks
-  const [geoStatus, setGeoStatus] = useState<'idle' | 'requesting' | 'success' | 'manual' | 'denied' | 'unavailable' | 'error'>('idle');
-  const [geoMessage, setGeoMessage] = useState<string>('');
-  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
-  const [isManualLocked, setIsManualLocked] = useState<boolean>(false);
-  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  // Centralized Device GPS Context (authoritative single source of truth)
+  const {
+    location,
+    status: geoStatus,
+    statusMessage: geoMessage,
+    accuracy,
+    accuracyQuality,
+    permissionState,
+    refreshLocation,
+    isLoading: isRefreshing,
+    addressLabel,
+    lastUpdatedTime,
+  } = useUserLocation();
+
+  // Real user GPS coordinates
+  const userLocation = location ? { lat: location.latitude, lng: location.longitude } : null;
+
+  // Manual area search override state
+  const [manualSearchCenter, setManualSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [manualLocationLabel, setManualLocationLabel] = useState<string>('');
+  const isManualLocked = Boolean(manualSearchCenter);
+
+  // Active search center and label
+  const searchCenter = manualSearchCenter || (userLocation || DEFAULT_CENTER);
+  const locationLabel = isManualLocked
+    ? manualLocationLabel
+    : addressLabel
+    ? addressLabel
+    : userLocation
+    ? `Current GPS (${userLocation.lat.toFixed(4)}°, ${userLocation.lng.toFixed(4)}°)`
+    : 'Default Map Center';
+
   const [refreshToken, setRefreshToken] = useState<number>(Date.now());
 
   // Input states
@@ -572,8 +745,6 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
 
   const categories = ['All', 'Hospitals', 'Pharmacies', 'Clinics', 'Diagnostic Labs'];
 
-  const hasInitializedGpsRef = useRef<boolean>(false);
-
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -583,100 +754,57 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
     };
   }, []);
 
-  // Obtain & Refresh Current GPS Geolocation
-  const requestCurrentLocation = useCallback((isForced = false) => {
-    if (isRefreshing || (geoStatus === 'requesting' && !isForced)) return;
-
-    if (!navigator.geolocation) {
-      setGeoStatus('unavailable');
-      setGeoMessage('Geolocation API is not supported by your browser. Please search manually.');
-      return;
-    }
-
-    setIsRefreshing(true);
-    setGeoStatus('requesting');
-    setGeoMessage('Obtaining fresh browser GPS position...');
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (!isMountedRef.current) return;
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const accuracy = Math.round(pos.coords.accuracy);
-
-        const freshCoords = { lat, lng };
-
-        setUserLocation(freshCoords);
-        setSearchCenter(freshCoords);
-        setIsManualLocked(false); // Reset manual lock when user requests fresh location
-        setLocationLabel(`Current Location (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)`);
-        setGpsAccuracy(accuracy);
-        setGeoStatus('success');
-        setGeoMessage(`GPS acquired & stabilized (±${accuracy}m accuracy)`);
-
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        setLastRefreshedAt(timeStr);
-        setRefreshToken(Date.now()); // Trigger fresh Places search
-        setIsRefreshing(false);
-      },
-      (err) => {
-        if (!isMountedRef.current) return;
-        setIsRefreshing(false);
-        if (err.code === 1) {
-          setGeoStatus('denied');
-          setGeoMessage('Location permission denied. Enter a city or landmark below to search.');
-        } else if (err.code === 2) {
-          setGeoStatus('unavailable');
-          setGeoMessage('GPS position unavailable. Search manually below.');
-        } else {
-          setGeoStatus('error');
-          setGeoMessage('GPS request timed out. Please click Refresh or search manually.');
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  }, [isRefreshing, geoStatus]);
-
-  // Request GPS once on component mount
+  // Sync token when GPS location changes
   useEffect(() => {
-    if (!hasInitializedGpsRef.current) {
-      hasInitializedGpsRef.current = true;
-      requestCurrentLocation(false);
+    if (location && !manualSearchCenter) {
+      setRefreshToken(Date.now());
     }
-  }, [requestCurrentLocation]);
+  }, [location?.latitude, location?.longitude, manualSearchCenter]);
 
-  // Manual City / Area Geocoding Search
+  // Request & Refresh Current GPS Geolocation
+  const requestCurrentLocation = useCallback(async (isForced = false) => {
+    setManualSearchCenter(null);
+    setManualLocationLabel('');
+    const fresh = await refreshLocation(isForced);
+    if (fresh) {
+      setRefreshToken(Date.now());
+    }
+  }, [refreshLocation]);
+
+  // Manual City / Area Geocoding Search using resilient API proxy
   const handleAreaSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!areaInput.trim()) return;
+    const query = areaInput.trim();
+    if (!query) return;
 
     setIsGeocoding(true);
     try {
-      if ((window as any).google?.maps?.Geocoder) {
-        const geocoder = new google.maps.Geocoder();
-        geocoder.geocode({ address: areaInput }, (results, status) => {
-          if (!isMountedRef.current) return;
-          setIsGeocoding(false);
-          if (status === 'OK' && results && results[0]) {
-            const loc = results[0].geometry.location;
-            const newCenter = { lat: loc.lat(), lng: loc.lng() };
-            setSearchCenter(newCenter);
-            setLocationLabel(results[0].formatted_address);
-            setIsManualLocked(true); // Lock search center to manual input, keeping GPS separate
-            setGeoStatus('manual');
-            setGeoMessage(`Map centered on manual search: ${results[0].formatted_address}`);
-            setRefreshToken(Date.now()); // Trigger fresh places search
-            showToast(`Centered on ${results[0].formatted_address}`, 'success');
-          } else {
-            showToast(`Could not locate area "${areaInput}". Please check spelling or try a city name.`, 'error');
-          }
-        });
+      const res = await fetch('/api/location/geocode-address', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: query }),
+      });
+
+      const data = await res.json();
+      if (!isMountedRef.current) return;
+      setIsGeocoding(false);
+
+      if (data.success && data.location) {
+        const newCenter = { lat: Number(data.location.lat), lng: Number(data.location.lng) };
+        setManualSearchCenter(newCenter);
+        setManualLocationLabel(data.formattedAddress || query);
+        setRefreshToken(Date.now()); // Trigger fresh places search
+        showToast(`Map centered on ${data.formattedAddress || query}`, 'success');
       } else {
-        if (isMountedRef.current) setIsGeocoding(false);
+        showToast(
+          data.error || `Could not locate area "${query}". Please check spelling or try a prominent city name.`,
+          'error'
+        );
       }
     } catch (err) {
       if (isMountedRef.current) setIsGeocoding(false);
-      console.error('Geocoding error:', err);
+      console.error('Area geocoding error:', err);
+      showToast(`Unable to search area at this time. Please try again.`, 'error');
     }
   };
 
@@ -791,18 +919,18 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
         <div className={`p-4 rounded-2xl border text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-colors ${
           isManualLocked
             ? 'bg-purple-50/80 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/60 text-purple-900 dark:text-purple-200'
-            : geoStatus === 'success'
+            : geoStatus === 'located'
             ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200'
-            : geoStatus === 'denied' || geoStatus === 'error' || geoStatus === 'unavailable'
+            : geoStatus === 'permission_denied' || geoStatus === 'error' || geoStatus === 'unavailable' || geoStatus === 'timeout'
             ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200'
             : 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 text-blue-900 dark:text-blue-200'
         }`}>
           <div className="flex items-center gap-2.5">
-            {isRefreshing || geoStatus === 'requesting' ? (
+            {isRefreshing || geoStatus === 'acquiring' ? (
               <JevanCareLoader size="xs" color="emerald" />
             ) : isManualLocked ? (
               <Compass className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-            ) : geoStatus === 'success' ? (
+            ) : geoStatus === 'located' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             ) : (
               <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -812,15 +940,15 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
                 <span className="font-bold">
                   {isManualLocked
                     ? 'Manual Search Area Active'
-                    : geoStatus === 'success'
-                    ? 'Using Real-Time Device GPS'
-                    : geoStatus === 'requesting'
+                    : geoStatus === 'located'
+                    ? `Using Real-Time Device GPS (±${accuracy ? Math.round(accuracy) : 0}m)`
+                    : geoStatus === 'acquiring'
                     ? 'Detecting Device GPS...'
                     : 'Location Service Alert'}
                 </span>
-                {lastRefreshedAt && (
+                {lastUpdatedTime && (
                   <span className="text-[10px] text-slate-500 font-normal">
-                    • Refreshed at {lastRefreshedAt}
+                    • Refreshed at {lastUpdatedTime}
                   </span>
                 )}
               </div>
@@ -977,7 +1105,7 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
 
             {/* Map Canvas */}
             <div className="w-full h-[360px] sm:h-[450px] md:h-[520px] relative">
-              <Map
+              <GoogleMap
                 defaultCenter={searchCenter}
                 defaultZoom={14}
                 mapId="DEMO_MAP_ID"
@@ -989,6 +1117,7 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
                 <PlacesMapContent
                   center={searchCenter}
                   userLocation={userLocation}
+                  accuracy={accuracy}
                   locationLabel={locationLabel}
                   category={category}
                   radiusKm={radiusKm}
@@ -999,7 +1128,7 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
                   selectedPlace={selectedPlace}
                   onSelectPlace={setSelectedPlace}
                 />
-              </Map>
+              </GoogleMap>
             </div>
 
             {/* Selected Place Card overlay */}
@@ -1055,12 +1184,90 @@ export const NearbyHealthcareMap: React.FC<NearbyHealthcareMapProps> = ({ onOpen
                 <div className="p-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-center space-y-3">
                   <JevanCareLoader size="lg" color="forest" variant="card" label="Finding nearby healthcare facilities..." />
                 </div>
-              ) : placesError || places.length === 0 ? (
+              ) : placesError && (placesError.includes('API_KEY_SERVICE_BLOCKED') || placesError.includes('blocked')) ? (
+                <div className="p-5 bg-amber-50/95 dark:bg-amber-950/50 rounded-2xl border border-amber-300 dark:border-amber-700/60 text-slate-800 dark:text-slate-200 space-y-3 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-xs text-amber-900 dark:text-amber-200">Google Cloud API Key Restrictions Update Required</h4>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                        The API key for project <code>891628260700</code> has API restrictions that block <strong>Places API (New)</strong>.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/90 dark:bg-slate-900/90 p-3 rounded-xl border border-amber-200 dark:border-amber-800/80 text-[11px] text-slate-700 dark:text-slate-300 space-y-1.5 font-sans">
+                    <p className="font-bold text-amber-900 dark:text-amber-200">To allow nearby healthcare search:</p>
+                    <ol className="list-decimal pl-4 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                      <li>Go to <strong>Google Cloud Console → APIs & Services → Credentials</strong>.</li>
+                      <li>Click your API key to open its settings.</li>
+                      <li>Under <strong>API restrictions</strong>, add <strong>Places API (New)</strong> (or choose <em>Don't restrict key</em>).</li>
+                      <li>Click <strong>Save</strong>.</li>
+                    </ol>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials?project=891628260700"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-2.5 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                    >
+                      <span>Update API Key Restrictions</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setRefreshToken((prev) => prev + 1)}
+                      className="py-2.5 px-3 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Retry</span>
+                    </button>
+                  </div>
+                </div>
+              ) : placesError && (placesError.includes('Places API') || placesError.includes('403') || placesError.includes('PERMISSION_DENIED') || placesError.includes('disabled') || placesError.includes('LegacyApiNotActivated')) ? (
+                <div className="p-5 bg-amber-50/90 dark:bg-amber-950/40 rounded-2xl border border-amber-300 dark:border-amber-700/60 text-slate-800 dark:text-slate-200 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-xs text-amber-900 dark:text-amber-200">Google Cloud Places API (New) Setup Required</h4>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                        The Google Maps key is loaded, but <strong>Places API (New)</strong> is not yet enabled for project <code>891628260700</code>.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/80 dark:bg-slate-900/80 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800 text-[10px] font-mono text-slate-700 dark:text-slate-300 break-words">
+                    {placesError}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <a
+                      href="https://console.developers.google.com/apis/api/places.googleapis.com/overview?project=891628260700"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                    >
+                      <span>Enable Places API (New) in Cloud Console</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setRefreshToken((prev) => prev + 1)}
+                      className="py-2 px-3 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Retry</span>
+                    </button>
+                  </div>
+                </div>
+              ) : places.length === 0 ? (
                 <div className="p-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-center space-y-3">
                   <AlertCircle className="w-8 h-8 text-amber-500 mx-auto" />
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-200">No medical facilities found</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Try increasing the search radius (e.g., 10 km or 20 km) or typing another area name above.
+                    {placesError || `Try increasing the search radius (e.g., 10 km or 20 km) or typing another area name above.`}
                   </p>
                   <button
                     onClick={() => {
